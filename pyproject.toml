@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.40"]
+gemini = ["google-genai>=1.0"]
 genai-hub = ["generative-ai-hub-sdk>=3.0"]
 dev = ["pytest>=8.0"]
 

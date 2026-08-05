@@ -37,7 +37,9 @@ def get_provider(
     if not name:
         # Infer from whichever credential is present. Fall back to the offline
         # demo provider so Generate works without a paid API key.
-        if os.getenv("ANTHROPIC_API_KEY"):
+        if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+            name = "gemini"
+        elif os.getenv("ANTHROPIC_API_KEY"):
             name = "anthropic"
         elif os.getenv("OPENAI_API_KEY"):
             name = "openai"
@@ -50,6 +52,10 @@ def get_provider(
         from .demo_provider import DemoProvider
 
         return DemoProvider(model=model)
+    if name in ("gemini", "google", "google-ai", "ai-studio"):
+        from .gemini_provider import GeminiProvider
+
+        return GeminiProvider(model=model)
     if name == "anthropic":
         from .anthropic_provider import AnthropicProvider
 
@@ -64,7 +70,7 @@ def get_provider(
         return GenAIHubProvider(model=model)
 
     raise ProviderError(
-        f"Unknown provider '{name}'. Supported: demo, anthropic, openai, genai-hub."
+        f"Unknown provider '{name}'. Supported: demo, gemini, anthropic, openai, genai-hub."
     )
 
 

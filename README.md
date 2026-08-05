@@ -96,14 +96,16 @@ wdio.conf.js                      wdi5 configuration
 
 ## Choosing a provider
 
-Set one credential in `.env`; the provider is inferred.
+Set one credential in `.env`; the provider is inferred (or set
+`FIORI_GENIE_PROVIDER` explicitly).
 
-- **Anthropic or OpenAI** — recommended locally. Both are driven through forced
-  tool calls, so the response is already schema-shaped.
-- **SAP Generative AI Hub** — keeps prompts inside your BTP subaccount. The
-  provider is implemented but has **not been verified against a live AI Core
-  tenant**; expect to adjust it. It exists so the switch is a config change
-  rather than a rewrite.
+- **Google AI Studio / Gemini** — best unpaid path. Create a key at
+  [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then
+  `pip install google-genai` and set `GEMINI_API_KEY` + `FIORI_GENIE_PROVIDER=gemini`.
+  Default model: `gemini-2.5-flash`.
+- **demo** — offline; matches sample specs to built-in fixtures (no LLM).
+- **Anthropic or OpenAI** — paid / credit-based; forced tool calls for structured IR.
+- **SAP Generative AI Hub** — BTP-native; implemented but not verified on a live tenant.
 
 ## Things worth knowing
 
