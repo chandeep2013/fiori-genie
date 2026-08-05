@@ -1,0 +1,231 @@
+{
+  "namespace": "com.acme.procurement",
+  "projectName": "purchase-requisition",
+  "description": "Purchase requisition capture and approval",
+  "entities": [
+    {
+      "name": "Suppliers",
+      "label": "Supplier",
+      "doc": "Vendors approved for purchasing",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "name", "type": "String", "length": 100, "label": "Supplier Name", "notNull": true },
+        { "name": "country", "type": "String", "length": 3, "label": "Country" },
+        { "name": "email", "type": "String", "length": 255, "label": "Contact Email" },
+        { "name": "rating", "type": "Decimal", "precision": 3, "scale": 2, "label": "Rating" }
+      ],
+      "relations": [],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Supplier",
+          "typeNamePlural": "Suppliers",
+          "titleField": "name",
+          "descriptionField": "country"
+        },
+        "lineItem": ["name", "country", "email", "rating"],
+        "selectionFields": ["name", "country"],
+        "fieldGroups": []
+      }
+    },
+    {
+      "name": "PurchaseRequisitions",
+      "label": "Purchase Requisition",
+      "doc": "Header of a purchase requisition",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "reqNumber", "type": "String", "length": 20, "label": "Requisition Number", "notNull": true },
+        { "name": "title", "type": "String", "length": 120, "label": "Title" },
+        {
+          "name": "status",
+          "type": "String",
+          "length": 20,
+          "label": "Status",
+          "enum": {
+            "DRAFT": "Draft",
+            "SUBMITTED": "Submitted",
+            "APPROVED": "Approved",
+            "REJECTED": "Rejected"
+          },
+          "default": "'DRAFT'"
+        },
+        { "name": "requestedBy", "type": "String", "length": 80, "label": "Requested By" },
+        { "name": "requiredBy", "type": "Date", "label": "Required By" },
+        { "name": "totalAmount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Total Amount" },
+        { "name": "currency", "type": "String", "length": 3, "label": "Currency" }
+      ],
+      "relations": [
+        {
+          "name": "supplier",
+          "target": "Suppliers",
+          "cardinality": "to-one",
+          "kind": "association",
+          "label": "Supplier"
+        },
+        {
+          "name": "items",
+          "target": "PurchaseRequisitionItems",
+          "cardinality": "to-many",
+          "kind": "composition",
+          "backlink": "requisition",
+          "label": "Items"
+        }
+      ],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Purchase Requisition",
+          "typeNamePlural": "Purchase Requisitions",
+          "titleField": "reqNumber",
+          "descriptionField": "title"
+        },
+        "lineItem": ["reqNumber", "title", "status", "supplier", "totalAmount", "requiredBy"],
+        "selectionFields": ["reqNumber", "status", "supplier"],
+        "fieldGroups": [
+          {
+            "id": "General",
+            "label": "General Information",
+            "fields": ["reqNumber", "title", "status", "requestedBy", "requiredBy"]
+          },
+          {
+            "id": "Commercial",
+            "label": "Commercial",
+            "fields": ["supplier", "totalAmount", "currency"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "PurchaseRequisitionItems",
+      "label": "Requisition Item",
+      "useCuid": true,
+      "useManaged": false,
+      "fields": [
+        { "name": "position", "type": "Integer", "label": "Position" },
+        { "name": "material", "type": "String", "length": 40, "label": "Material" },
+        { "name": "description", "type": "String", "length": 200, "label": "Description" },
+        { "name": "quantity", "type": "Decimal", "precision": 13, "scale": 3, "label": "Quantity" },
+        { "name": "unit", "type": "String", "length": 3, "label": "Unit" },
+        { "name": "unitPrice", "type": "Decimal", "precision": 15, "scale": 2, "label": "Unit Price" }
+      ],
+      "relations": [
+        {
+          "name": "requisition",
+          "target": "PurchaseRequisitions",
+          "cardinality": "to-one",
+          "kind": "association",
+          "notNull": true
+        }
+      ],
+      "ui": {
+        "floorplan": "object-page-only",
+        "headerInfo": {
+          "typeName": "Requisition Item",
+          "typeNamePlural": "Requisition Items",
+          "titleField": "material",
+          "descriptionField": "description"
+        },
+        "lineItem": ["position", "material", "description", "quantity", "unit", "unitPrice"],
+        "selectionFields": [],
+        "fieldGroups": []
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "ProcurementService",
+      "path": "procurement",
+      "requires": "authenticated-user",
+      "entities": [
+        { "entity": "PurchaseRequisitions", "draftEnabled": true, "readonly": false },
+        { "entity": "PurchaseRequisitionItems", "draftEnabled": false, "readonly": false },
+        { "entity": "Suppliers", "draftEnabled": false, "readonly": true }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "id": "purchasereq",
+      "title": "Manage Purchase Requisitions",
+      "description": "Create, review and approve purchase requisitions",
+      "service": "ProcurementService",
+      "mainEntity": "PurchaseRequisitions"
+    }
+  ],
+  "sampleData": {
+    "Suppliers": [
+      {
+        "ID": "7c3f1a10-0001-4000-8000-000000000001",
+        "name": "Rheinmetall Industrieteile GmbH",
+        "country": "DE",
+        "email": "sales@rheinmetall-it.example",
+        "rating": "4.50"
+      },
+      {
+        "ID": "7c3f1a10-0001-4000-8000-000000000002",
+        "name": "Nordic Steel AB",
+        "country": "SE",
+        "email": "orders@nordicsteel.example",
+        "rating": "4.10"
+      }
+    ],
+    "PurchaseRequisitions": [
+      {
+        "ID": "7c3f1a10-0002-4000-8000-000000000001",
+        "reqNumber": "PR-000001",
+        "title": "Replacement bearings for line 3",
+        "status": "SUBMITTED",
+        "requestedBy": "c.mudigolam",
+        "requiredBy": "2026-09-15",
+        "totalAmount": "12500.00",
+        "currency": "EUR",
+        "supplier_ID": "7c3f1a10-0001-4000-8000-000000000001"
+      },
+      {
+        "ID": "7c3f1a10-0002-4000-8000-000000000002",
+        "reqNumber": "PR-000002",
+        "title": "Steel plate stock Q4",
+        "status": "DRAFT",
+        "requestedBy": "a.kumar",
+        "requiredBy": "2026-10-01",
+        "totalAmount": "48200.00",
+        "currency": "EUR",
+        "supplier_ID": "7c3f1a10-0001-4000-8000-000000000002"
+      }
+    ],
+    "PurchaseRequisitionItems": [
+      {
+        "ID": "7c3f1a10-0003-4000-8000-000000000001",
+        "position": "10",
+        "material": "MAT-4711",
+        "description": "Deep groove ball bearing 6205",
+        "quantity": "50.000",
+        "unit": "EA",
+        "unitPrice": "45.00",
+        "requisition_ID": "7c3f1a10-0002-4000-8000-000000000001"
+      },
+      {
+        "ID": "7c3f1a10-0003-4000-8000-000000000002",
+        "position": "20",
+        "material": "MAT-4712",
+        "description": "Bearing housing SNL 505",
+        "quantity": "25.000",
+        "unit": "EA",
+        "unitPrice": "410.00",
+        "requisition_ID": "7c3f1a10-0002-4000-8000-000000000001"
+      },
+      {
+        "ID": "7c3f1a10-0003-4000-8000-000000000003",
+        "position": "10",
+        "material": "MAT-9001",
+        "description": "Hot rolled steel plate S355 10mm",
+        "quantity": "120.000",
+        "unit": "TO",
+        "unitPrice": "401.67",
+        "requisition_ID": "7c3f1a10-0002-4000-8000-000000000002"
+      }
+    ]
+  }
+}

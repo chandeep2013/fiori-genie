@@ -1,0 +1,218 @@
+<mvc:View
+    controllerName="fiorigenie.controller.Main"
+    xmlns="sap.m"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns:f="sap.f"
+    xmlns:l="sap.ui.layout"
+    xmlns:core="sap.ui.core"
+    xmlns:editor="sap.ui.codeeditor"
+    height="100%">
+
+    <f:DynamicPage id="page" headerExpanded="true" busy="{app>/busy}" busyIndicatorDelay="0">
+
+        <f:title>
+            <f:DynamicPageTitle>
+                <f:heading>
+                    <Title text="{i18n>appTitle}" level="H1"/>
+                </f:heading>
+                <f:snappedContent>
+                    <Text text="{i18n>appDescription}"/>
+                </f:snappedContent>
+                <f:expandedContent>
+                    <Text text="{i18n>appDescription}"/>
+                </f:expandedContent>
+                <f:actions>
+                    <ObjectStatus
+                        text="{app>/providerLabel}"
+                        state="{= ${app>/providerReady} ? 'Success' : 'Warning' }"
+                        icon="sap-icon://ai"/>
+                    <Button
+                        text="{i18n>download}"
+                        icon="sap-icon://download"
+                        visible="{= !!${app>/runId} }"
+                        press=".onDownload"/>
+                    <Button
+                        text="{i18n>generate}"
+                        type="Emphasized"
+                        icon="sap-icon://generate-shortcut"
+                        enabled="{= ${app>/providerReady} &amp;&amp; ${app>/spec}.length > 20 }"
+                        press=".onGenerate"/>
+                </f:actions>
+            </f:DynamicPageTitle>
+        </f:title>
+
+        <f:content>
+            <VBox class="sapUiSmallMargin">
+
+                <MessageStrip
+                    text="{app>/message}"
+                    type="{app>/messageType}"
+                    showIcon="true"
+                    visible="{= !!${app>/message} }"
+                    class="sapUiSmallMarginBottom"/>
+
+                <Panel headerText="{i18n>specTitle}" expandable="true" expanded="true">
+                    <VBox>
+                        <TextArea
+                            value="{app>/spec}"
+                            rows="14"
+                            width="100%"
+                            growing="false"
+                            placeholder="{i18n>specPlaceholder}"
+                            class="fgSpecArea"/>
+                        <HBox alignItems="Center" class="sapUiSmallMarginTop" wrap="Wrap">
+                            <Input
+                                value="{app>/projectName}"
+                                placeholder="{i18n>projectNamePlaceholder}"
+                                width="22rem"
+                                class="sapUiTinyMarginEnd"/>
+                            <Label text="Attempts" class="sapUiTinyMarginEnd"/>
+                            <StepInput
+                                value="{app>/attempts}"
+                                min="1"
+                                max="5"
+                                width="6rem"
+                                class="sapUiTinyMarginEnd"/>
+                            <Button
+                                text="{i18n>loadSample}"
+                                icon="sap-icon://document-text"
+                                press=".onLoadSample"
+                                class="sapUiTinyMarginEnd"/>
+                            <Button
+                                text="{i18n>clear}"
+                                icon="sap-icon://clear-all"
+                                press=".onClear"/>
+                        </HBox>
+                    </VBox>
+                </Panel>
+
+                <IconTabBar
+                    expandable="false"
+                    stretchContentHeight="true"
+                    class="sapUiSmallMarginTop sapUiResponsiveContentPadding"
+                    visible="{app>/hasResult}">
+
+                    <items>
+                        <IconTabFilter text="{i18n>tabDesign}" icon="sap-icon://database" key="design">
+                            <VBox>
+                                <Title text="{i18n>entitiesTitle}" level="H3" class="sapUiSmallMarginBottom"/>
+                                <VBox items="{app>/entities}">
+                                    <Panel
+                                        headerText="{app>name}"
+                                        expandable="true"
+                                        expanded="true"
+                                        class="fgEntityPanel sapUiSmallMarginBottom">
+                                        <VBox>
+                                            <Text
+                                                text="{app>doc}"
+                                                visible="{= !!${app>doc} }"
+                                                class="sapUiTinyMarginBottom"/>
+                                            <HBox wrap="Wrap" class="sapUiTinyMarginBottom">
+                                                <ObjectStatus
+                                                    text="{app>aspects}"
+                                                    visible="{= !!${app>aspects} }"
+                                                    state="Information"
+                                                    class="sapUiTinyMarginEnd"/>
+                                            </HBox>
+                                            <Table items="{app>members}" fixedLayout="false">
+                                                <columns>
+                                                    <Column><Text text="{i18n>colField}"/></Column>
+                                                    <Column><Text text="{i18n>colType}"/></Column>
+                                                    <Column><Text text="{i18n>colLabel}"/></Column>
+                                                    <Column><Text text="{i18n>colFlags}"/></Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem>
+                                                        <cells>
+                                                            <Text text="{app>name}" class="fgMono"/>
+                                                            <Text text="{app>type}" class="fgMono"/>
+                                                            <Text text="{app>label}"/>
+                                                            <Text text="{app>flags}"/>
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </VBox>
+                                    </Panel>
+                                </VBox>
+
+                                <Title text="{i18n>servicesTitle}" level="H3" class="sapUiSmallMarginBottom sapUiSmallMarginTop"/>
+                                <List items="{app>/services}">
+                                    <StandardListItem
+                                        title="{app>name}"
+                                        description="{app>detail}"
+                                        icon="sap-icon://cloud"/>
+                                </List>
+                            </VBox>
+                        </IconTabFilter>
+
+                        <IconTabFilter text="{i18n>tabFiles}" icon="sap-icon://document" key="files">
+                            <l:Splitter height="34rem">
+                                <l:contentAreas>
+                                    <ScrollContainer
+                                        vertical="true"
+                                        height="100%"
+                                        class="fgFileList">
+                                        <layoutData>
+                                            <l:SplitterLayoutData size="22rem"/>
+                                        </layoutData>
+                                        <List
+                                            items="{app>/files}"
+                                            mode="SingleSelectMaster"
+                                            selectionChange=".onFileSelect">
+                                            <StandardListItem title="{app>path}"/>
+                                        </List>
+                                    </ScrollContainer>
+
+                                    <VBox height="100%">
+                                        <Toolbar>
+                                            <Title text="{app>/selectedFile}" level="H4" class="fgMono"/>
+                                            <ToolbarSpacer/>
+                                            <Button
+                                                icon="sap-icon://copy"
+                                                tooltip="Copy to clipboard"
+                                                press=".onCopy"
+                                                visible="{= !!${app>/selectedFile} }"/>
+                                        </Toolbar>
+                                        <editor:CodeEditor
+                                            value="{app>/selectedContent}"
+                                            type="{app>/selectedType}"
+                                            editable="false"
+                                            lineNumbers="true"
+                                            height="30rem"
+                                            width="100%"/>
+                                    </VBox>
+                                </l:contentAreas>
+                            </l:Splitter>
+                        </IconTabFilter>
+
+                        <IconTabFilter text="{i18n>tabLog}" icon="sap-icon://history" key="log">
+                            <VBox class="sapUiSmallMargin">
+                                <Title text="Progress" level="H4" class="sapUiTinyMarginBottom"/>
+                                <VBox items="{app>/log}">
+                                    <Text text="{app>text}" class="fgLogLine"/>
+                                </VBox>
+
+                                <Title text="Attempts" level="H4" class="sapUiSmallMarginTop sapUiTinyMarginBottom"/>
+                                <List items="{app>/attemptTrace}">
+                                    <StandardListItem
+                                        title="Attempt {app>number} — {app>stage}"
+                                        description="{app>summary}"
+                                        icon="{= ${app>stage} === 'ok' ? 'sap-icon://accept' : 'sap-icon://error' }"
+                                        iconInset="false"/>
+                                </List>
+                            </VBox>
+                        </IconTabFilter>
+                    </items>
+                </IconTabBar>
+
+                <IllustratedMessage
+                    illustrationType="sapIllus-NoEntries"
+                    title="Nothing generated yet"
+                    description="{i18n>designEmpty}"
+                    visible="{= !${app>/hasResult} }"/>
+
+            </VBox>
+        </f:content>
+    </f:DynamicPage>
+</mvc:View>

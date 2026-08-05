@@ -1,0 +1,35 @@
+.fgSpecArea textarea {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.fgFileList {
+    border-right: 1px solid var(--sapGroup_ContentBorderColor);
+    height: 100%;
+    overflow: auto;
+}
+
+.fgFileList .sapMSLITitleOnly {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+}
+
+.fgEditorWrap {
+    height: 32rem;
+}
+
+.fgEntityPanel .sapMPanelHdr {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+
+.fgMono {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+
+.fgLogLine {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    display: block;
+    padding: 0.125rem 0;
+}

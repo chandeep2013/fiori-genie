@@ -1,0 +1,15 @@
+using { {{ model.namespace }} as db } from '../db/schema';
+{% for service in model.services %}
+
+service {{ service.name }}{{ service_options(service) }} {
+{% for exposed in service.entities %}
+{% if exposed.readonly %}
+  @readonly
+{% endif %}
+{% if exposed.draft_enabled %}
+  @odata.draft.enabled
+{% endif %}
+  entity {{ exposed.exposed_name }} as projection on db.{{ exposed.entity }};
+{% endfor %}
+}
+{% endfor %}
