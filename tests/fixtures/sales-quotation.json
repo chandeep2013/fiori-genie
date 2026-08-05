@@ -1,0 +1,197 @@
+{
+  "namespace": "com.acme.sales",
+  "projectName": "sales-quotation",
+  "description": "Sales quotation capture",
+  "entities": [
+    {
+      "name": "Customers",
+      "label": "Customer",
+      "doc": "Customer master (read-only)",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "customerNumber", "type": "String", "length": 10, "label": "Customer Number", "notNull": true },
+        { "name": "name", "type": "String", "length": 100, "label": "Name" },
+        { "name": "country", "type": "String", "length": 3, "label": "Country" },
+        { "name": "paymentTerms", "type": "String", "length": 40, "label": "Payment Terms" }
+      ],
+      "relations": [],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Customer",
+          "typeNamePlural": "Customers",
+          "titleField": "name",
+          "descriptionField": "customerNumber"
+        },
+        "lineItem": ["customerNumber", "name", "country", "paymentTerms"],
+        "selectionFields": ["customerNumber", "name"],
+        "fieldGroups": []
+      }
+    },
+    {
+      "name": "SalesQuotations",
+      "label": "Sales Quotation",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "quotationNumber", "type": "String", "length": 20, "label": "Quotation Number", "notNull": true },
+        { "name": "description", "type": "String", "length": 120, "label": "Description" },
+        { "name": "validFrom", "type": "Date", "label": "Valid From" },
+        { "name": "validTo", "type": "Date", "label": "Valid To" },
+        {
+          "name": "status",
+          "type": "String",
+          "length": 20,
+          "label": "Status",
+          "enum": {
+            "DRAFT": "Draft",
+            "SENT": "Sent",
+            "ACCEPTED": "Accepted",
+            "REJECTED": "Rejected",
+            "EXPIRED": "Expired"
+          },
+          "default": "'DRAFT'"
+        },
+        { "name": "netValue", "type": "Decimal", "precision": 15, "scale": 2, "label": "Net Value" },
+        { "name": "currency", "type": "String", "length": 3, "label": "Currency" },
+        { "name": "salesOrg", "type": "String", "length": 4, "label": "Sales Organisation" }
+      ],
+      "relations": [
+        {
+          "name": "customer",
+          "target": "Customers",
+          "cardinality": "to-one",
+          "kind": "association",
+          "label": "Customer"
+        },
+        {
+          "name": "items",
+          "target": "QuotationItems",
+          "cardinality": "to-many",
+          "kind": "composition",
+          "backlink": "quotation",
+          "label": "Items"
+        }
+      ],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Sales Quotation",
+          "typeNamePlural": "Sales Quotations",
+          "titleField": "quotationNumber",
+          "descriptionField": "description"
+        },
+        "lineItem": ["quotationNumber", "description", "customer", "status", "validTo", "netValue", "currency"],
+        "selectionFields": ["quotationNumber", "status", "customer"],
+        "fieldGroups": [
+          {
+            "id": "General",
+            "label": "General Information",
+            "fields": ["quotationNumber", "description", "status", "salesOrg", "validFrom", "validTo"]
+          },
+          {
+            "id": "Commercial",
+            "label": "Commercial",
+            "fields": ["customer", "netValue", "currency"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuotationItems",
+      "label": "Quotation Item",
+      "useCuid": true,
+      "useManaged": false,
+      "fields": [
+        { "name": "position", "type": "Integer", "label": "Position" },
+        { "name": "material", "type": "String", "length": 40, "label": "Material" },
+        { "name": "description", "type": "String", "length": 200, "label": "Description" },
+        { "name": "quantity", "type": "Decimal", "precision": 13, "scale": 3, "label": "Quantity" },
+        { "name": "unit", "type": "String", "length": 3, "label": "Unit" },
+        { "name": "unitPrice", "type": "Decimal", "precision": 15, "scale": 2, "label": "Unit Price" },
+        { "name": "netAmount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Net Amount" }
+      ],
+      "relations": [
+        {
+          "name": "quotation",
+          "target": "SalesQuotations",
+          "cardinality": "to-one",
+          "kind": "association",
+          "notNull": true
+        }
+      ],
+      "ui": {
+        "floorplan": "object-page-only",
+        "headerInfo": {
+          "typeName": "Quotation Item",
+          "typeNamePlural": "Quotation Items",
+          "titleField": "material",
+          "descriptionField": "description"
+        },
+        "lineItem": ["position", "material", "description", "quantity", "unit", "unitPrice", "netAmount"],
+        "selectionFields": [],
+        "fieldGroups": []
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "SalesService",
+      "path": "sales",
+      "requires": "authenticated-user",
+      "entities": [
+        { "entity": "SalesQuotations", "draftEnabled": true, "readonly": false },
+        { "entity": "QuotationItems", "draftEnabled": false, "readonly": false },
+        { "entity": "Customers", "draftEnabled": false, "readonly": true }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "id": "salesquote",
+      "title": "Manage Sales Quotations",
+      "description": "Create and track customer quotations",
+      "service": "SalesService",
+      "mainEntity": "SalesQuotations"
+    }
+  ],
+  "sampleData": {
+    "Customers": [
+      {
+        "ID": "c3000001-0001-4000-8000-000000000001",
+        "customerNumber": "C1000",
+        "name": "Bayerische Maschinen GmbH",
+        "country": "DE",
+        "paymentTerms": "Net 30"
+      }
+    ],
+    "SalesQuotations": [
+      {
+        "ID": "c3000001-0002-4000-8000-000000000001",
+        "quotationNumber": "SQ-000001",
+        "description": "Spare parts Q3",
+        "validFrom": "2026-08-01",
+        "validTo": "2026-09-30",
+        "status": "SENT",
+        "netValue": "15400.00",
+        "currency": "EUR",
+        "salesOrg": "1000",
+        "customer_ID": "c3000001-0001-4000-8000-000000000001"
+      }
+    ],
+    "QuotationItems": [
+      {
+        "ID": "c3000001-0003-4000-8000-000000000001",
+        "position": "10",
+        "material": "MAT-100",
+        "description": "Hydraulic pump",
+        "quantity": "2.000",
+        "unit": "EA",
+        "unitPrice": "7700.00",
+        "netAmount": "15400.00",
+        "quotation_ID": "c3000001-0002-4000-8000-000000000001"
+      }
+    ]
+  }
+}

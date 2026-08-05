@@ -1,0 +1,170 @@
+{
+  "namespace": "com.acme.hr",
+  "projectName": "leave-request",
+  "description": "Employee leave request and approval",
+  "entities": [
+    {
+      "name": "Employees",
+      "label": "Employee",
+      "doc": "HR employee master (read-only)",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "employeeNumber", "type": "String", "length": 12, "label": "Employee Number", "notNull": true },
+        { "name": "fullName", "type": "String", "length": 100, "label": "Full Name" },
+        { "name": "department", "type": "String", "length": 40, "label": "Department" },
+        { "name": "email", "type": "String", "length": 255, "label": "Email" }
+      ],
+      "relations": [],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Employee",
+          "typeNamePlural": "Employees",
+          "titleField": "fullName",
+          "descriptionField": "department"
+        },
+        "lineItem": ["employeeNumber", "fullName", "department", "email"],
+        "selectionFields": ["employeeNumber", "department"],
+        "fieldGroups": []
+      }
+    },
+    {
+      "name": "LeaveRequests",
+      "label": "Leave Request",
+      "doc": "Employee leave request",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "requestNumber", "type": "String", "length": 20, "label": "Request Number", "notNull": true },
+        {
+          "name": "leaveType",
+          "type": "String",
+          "length": 20,
+          "label": "Leave Type",
+          "enum": {
+            "ANNUAL": "Annual",
+            "SICK": "Sick",
+            "COMPENSATORY": "Compensatory",
+            "UNPAID": "Unpaid"
+          }
+        },
+        { "name": "startDate", "type": "Date", "label": "Start Date" },
+        { "name": "endDate", "type": "Date", "label": "End Date" },
+        { "name": "days", "type": "Decimal", "precision": 5, "scale": 1, "label": "Days" },
+        { "name": "reason", "type": "String", "length": 255, "label": "Reason" },
+        {
+          "name": "status",
+          "type": "String",
+          "length": 20,
+          "label": "Status",
+          "enum": {
+            "DRAFT": "Draft",
+            "SUBMITTED": "Submitted",
+            "APPROVED": "Approved",
+            "REJECTED": "Rejected",
+            "CANCELLED": "Cancelled"
+          },
+          "default": "'DRAFT'"
+        },
+        { "name": "managerComment", "type": "String", "length": 255, "label": "Manager Comment" }
+      ],
+      "relations": [
+        {
+          "name": "employee",
+          "target": "Employees",
+          "cardinality": "to-one",
+          "kind": "association",
+          "label": "Employee"
+        }
+      ],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Leave Request",
+          "typeNamePlural": "Leave Requests",
+          "titleField": "requestNumber",
+          "descriptionField": "leaveType"
+        },
+        "lineItem": ["requestNumber", "employee", "leaveType", "startDate", "endDate", "days", "status"],
+        "selectionFields": ["status", "leaveType", "employee"],
+        "fieldGroups": [
+          {
+            "id": "General",
+            "label": "General Information",
+            "fields": ["requestNumber", "employee", "leaveType", "startDate", "endDate", "days", "reason"]
+          },
+          {
+            "id": "Approval",
+            "label": "Approval",
+            "fields": ["status", "managerComment"]
+          }
+        ]
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "LeaveService",
+      "path": "leave",
+      "requires": "authenticated-user",
+      "entities": [
+        { "entity": "LeaveRequests", "draftEnabled": true, "readonly": false },
+        { "entity": "Employees", "draftEnabled": false, "readonly": true }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "id": "leaverequest",
+      "title": "Manage Leave Requests",
+      "description": "Create and approve employee leave requests",
+      "service": "LeaveService",
+      "mainEntity": "LeaveRequests"
+    }
+  ],
+  "sampleData": {
+    "Employees": [
+      {
+        "ID": "b2000001-0001-4000-8000-000000000001",
+        "employeeNumber": "E1001",
+        "fullName": "Chandeep Mudigolam",
+        "department": "Engineering",
+        "email": "c.mudigolam@example.com"
+      },
+      {
+        "ID": "b2000001-0001-4000-8000-000000000002",
+        "employeeNumber": "E1002",
+        "fullName": "Asha Kumar",
+        "department": "Sales",
+        "email": "a.kumar@example.com"
+      }
+    ],
+    "LeaveRequests": [
+      {
+        "ID": "b2000001-0002-4000-8000-000000000001",
+        "requestNumber": "LR-000001",
+        "leaveType": "ANNUAL",
+        "startDate": "2026-09-20",
+        "endDate": "2026-09-24",
+        "days": "5.0",
+        "reason": "Family vacation",
+        "status": "SUBMITTED",
+        "managerComment": "",
+        "employee_ID": "b2000001-0001-4000-8000-000000000001"
+      },
+      {
+        "ID": "b2000001-0002-4000-8000-000000000002",
+        "requestNumber": "LR-000002",
+        "leaveType": "SICK",
+        "startDate": "2026-08-12",
+        "endDate": "2026-08-13",
+        "days": "2.0",
+        "reason": "Medical appointment",
+        "status": "APPROVED",
+        "managerComment": "Approved",
+        "employee_ID": "b2000001-0001-4000-8000-000000000002"
+      }
+    ]
+  }
+}

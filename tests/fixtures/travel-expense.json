@@ -1,0 +1,243 @@
+{
+  "namespace": "com.acme.travel",
+  "projectName": "travel-expense",
+  "description": "Travel expense claim capture and approval",
+  "entities": [
+    {
+      "name": "CostCentres",
+      "label": "Cost Centre",
+      "doc": "Controlling cost centres",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "code", "type": "String", "length": 10, "label": "Cost Centre", "notNull": true },
+        { "name": "name", "type": "String", "length": 100, "label": "Name" },
+        { "name": "companyCode", "type": "String", "length": 4, "label": "Company Code" }
+      ],
+      "relations": [],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Cost Centre",
+          "typeNamePlural": "Cost Centres",
+          "titleField": "code",
+          "descriptionField": "name"
+        },
+        "lineItem": ["code", "name", "companyCode"],
+        "selectionFields": ["code", "name"],
+        "fieldGroups": []
+      }
+    },
+    {
+      "name": "ExpenseClaims",
+      "label": "Expense Claim",
+      "doc": "Header of a travel expense claim",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "claimNumber", "type": "String", "length": 20, "label": "Claim Number", "notNull": true },
+        { "name": "employeeName", "type": "String", "length": 80, "label": "Employee" },
+        { "name": "tripPurpose", "type": "String", "length": 120, "label": "Trip Purpose" },
+        { "name": "tripStart", "type": "Date", "label": "Trip Start" },
+        { "name": "tripEnd", "type": "Date", "label": "Trip End" },
+        {
+          "name": "status",
+          "type": "String",
+          "length": 20,
+          "label": "Status",
+          "enum": {
+            "DRAFT": "Draft",
+            "SUBMITTED": "Submitted",
+            "APPROVED": "Approved",
+            "REJECTED": "Rejected",
+            "PAID": "Paid"
+          },
+          "default": "'DRAFT'"
+        },
+        { "name": "totalAmount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Total Amount" },
+        { "name": "currency", "type": "String", "length": 3, "label": "Currency" }
+      ],
+      "relations": [
+        {
+          "name": "costCentre",
+          "target": "CostCentres",
+          "cardinality": "to-one",
+          "kind": "association",
+          "label": "Cost Centre"
+        },
+        {
+          "name": "items",
+          "target": "ExpenseItems",
+          "cardinality": "to-many",
+          "kind": "composition",
+          "backlink": "claim",
+          "label": "Items"
+        }
+      ],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Expense Claim",
+          "typeNamePlural": "Expense Claims",
+          "titleField": "claimNumber",
+          "descriptionField": "tripPurpose"
+        },
+        "lineItem": ["claimNumber", "employeeName", "tripPurpose", "status", "totalAmount", "currency", "costCentre"],
+        "selectionFields": ["claimNumber", "status", "employeeName", "costCentre"],
+        "fieldGroups": [
+          {
+            "id": "General",
+            "label": "General Information",
+            "fields": ["claimNumber", "employeeName", "tripPurpose", "tripStart", "tripEnd", "status"]
+          },
+          {
+            "id": "Commercial",
+            "label": "Commercial",
+            "fields": ["costCentre", "totalAmount", "currency"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExpenseItems",
+      "label": "Expense Item",
+      "useCuid": true,
+      "useManaged": false,
+      "fields": [
+        { "name": "position", "type": "Integer", "label": "Position" },
+        {
+          "name": "category",
+          "type": "String",
+          "length": 20,
+          "label": "Category",
+          "enum": {
+            "TRAVEL": "Travel",
+            "MEAL": "Meal",
+            "LODGING": "Lodging",
+            "OTHER": "Other"
+          }
+        },
+        { "name": "expenseDate", "type": "Date", "label": "Expense Date" },
+        { "name": "description", "type": "String", "length": 200, "label": "Description" },
+        { "name": "amount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Amount" },
+        { "name": "currency", "type": "String", "length": 3, "label": "Currency" }
+      ],
+      "relations": [
+        {
+          "name": "claim",
+          "target": "ExpenseClaims",
+          "cardinality": "to-one",
+          "kind": "association",
+          "notNull": true
+        }
+      ],
+      "ui": {
+        "floorplan": "object-page-only",
+        "headerInfo": {
+          "typeName": "Expense Item",
+          "typeNamePlural": "Expense Items",
+          "titleField": "description",
+          "descriptionField": "category"
+        },
+        "lineItem": ["position", "category", "expenseDate", "description", "amount", "currency"],
+        "selectionFields": [],
+        "fieldGroups": []
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "TravelService",
+      "path": "travel",
+      "requires": "authenticated-user",
+      "entities": [
+        { "entity": "ExpenseClaims", "draftEnabled": true, "readonly": false },
+        { "entity": "ExpenseItems", "draftEnabled": false, "readonly": false },
+        { "entity": "CostCentres", "draftEnabled": false, "readonly": true }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "id": "expenseclaim",
+      "title": "Manage Travel Expenses",
+      "description": "Create and approve travel expense claims",
+      "service": "TravelService",
+      "mainEntity": "ExpenseClaims"
+    }
+  ],
+  "sampleData": {
+    "CostCentres": [
+      {
+        "ID": "a1000001-0001-4000-8000-000000000001",
+        "code": "CC-4100",
+        "name": "Sales Europe",
+        "companyCode": "1000"
+      },
+      {
+        "ID": "a1000001-0001-4000-8000-000000000002",
+        "code": "CC-5200",
+        "name": "Engineering",
+        "companyCode": "1000"
+      }
+    ],
+    "ExpenseClaims": [
+      {
+        "ID": "a1000001-0002-4000-8000-000000000001",
+        "claimNumber": "EX-000001",
+        "employeeName": "c.mudigolam",
+        "tripPurpose": "Customer workshop Munich",
+        "tripStart": "2026-09-10",
+        "tripEnd": "2026-09-12",
+        "status": "SUBMITTED",
+        "totalAmount": "865.50",
+        "currency": "EUR",
+        "costCentre_ID": "a1000001-0001-4000-8000-000000000001"
+      },
+      {
+        "ID": "a1000001-0002-4000-8000-000000000002",
+        "claimNumber": "EX-000002",
+        "employeeName": "a.kumar",
+        "tripPurpose": "Plant visit Stuttgart",
+        "tripStart": "2026-10-01",
+        "tripEnd": "2026-10-02",
+        "status": "DRAFT",
+        "totalAmount": "312.00",
+        "currency": "EUR",
+        "costCentre_ID": "a1000001-0001-4000-8000-000000000002"
+      }
+    ],
+    "ExpenseItems": [
+      {
+        "ID": "a1000001-0003-4000-8000-000000000001",
+        "position": "10",
+        "category": "TRAVEL",
+        "expenseDate": "2026-09-10",
+        "description": "Flight FRA-MUC",
+        "amount": "185.00",
+        "currency": "EUR",
+        "claim_ID": "a1000001-0002-4000-8000-000000000001"
+      },
+      {
+        "ID": "a1000001-0003-4000-8000-000000000002",
+        "position": "20",
+        "category": "LODGING",
+        "expenseDate": "2026-09-10",
+        "description": "Hotel 2 nights",
+        "amount": "480.00",
+        "currency": "EUR",
+        "claim_ID": "a1000001-0002-4000-8000-000000000001"
+      },
+      {
+        "ID": "a1000001-0003-4000-8000-000000000003",
+        "position": "30",
+        "category": "MEAL",
+        "expenseDate": "2026-09-11",
+        "description": "Client dinner",
+        "amount": "200.50",
+        "currency": "EUR",
+        "claim_ID": "a1000001-0002-4000-8000-000000000001"
+      }
+    ]
+  }
+}

@@ -83,8 +83,10 @@ def status() -> Dict:
         detail = None
         if provider.name == "demo":
             detail = (
-                "Using offline demo provider (sample purchase-requisition model). "
-                "Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env for real generation."
+                "Using offline demo provider: it matches your spec to a built-in "
+                "sample (leave, travel, sales, maintenance, invoice, purchase). "
+                "It does not call an LLM. Add ANTHROPIC_API_KEY or OPENAI_API_KEY "
+                "for real generation from arbitrary specs."
             )
         return {
             "providerReady": True,

@@ -1,0 +1,199 @@
+{
+  "namespace": "com.acme.finance",
+  "projectName": "supplier-invoice",
+  "description": "Supplier invoice intake",
+  "entities": [
+    {
+      "name": "Suppliers",
+      "label": "Supplier",
+      "doc": "Vendor master (read-only)",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "name", "type": "String", "length": 100, "label": "Supplier Name", "notNull": true },
+        { "name": "country", "type": "String", "length": 3, "label": "Country" },
+        { "name": "vatNumber", "type": "String", "length": 20, "label": "VAT Number" },
+        { "name": "paymentTerms", "type": "String", "length": 40, "label": "Payment Terms" }
+      ],
+      "relations": [],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Supplier",
+          "typeNamePlural": "Suppliers",
+          "titleField": "name",
+          "descriptionField": "country"
+        },
+        "lineItem": ["name", "country", "vatNumber", "paymentTerms"],
+        "selectionFields": ["name", "country"],
+        "fieldGroups": []
+      }
+    },
+    {
+      "name": "SupplierInvoices",
+      "label": "Supplier Invoice",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "internalReference", "type": "String", "length": 20, "label": "Internal Reference", "notNull": true },
+        { "name": "invoiceNumber", "type": "String", "length": 16, "label": "Supplier Invoice Number" },
+        { "name": "invoiceDate", "type": "Date", "label": "Invoice Date" },
+        { "name": "dueDate", "type": "Date", "label": "Due Date" },
+        { "name": "purchaseOrder", "type": "String", "length": 20, "label": "Purchase Order" },
+        {
+          "name": "status",
+          "type": "String",
+          "length": 20,
+          "label": "Status",
+          "enum": {
+            "DRAFT": "Draft",
+            "IN_REVIEW": "In Review",
+            "POSTED": "Posted",
+            "BLOCKED": "Blocked",
+            "CANCELLED": "Cancelled"
+          },
+          "default": "'DRAFT'"
+        },
+        { "name": "netAmount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Net Amount" },
+        { "name": "taxAmount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Tax Amount" },
+        { "name": "grossAmount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Gross Amount" },
+        { "name": "currency", "type": "String", "length": 3, "label": "Currency" }
+      ],
+      "relations": [
+        {
+          "name": "supplier",
+          "target": "Suppliers",
+          "cardinality": "to-one",
+          "kind": "association",
+          "label": "Supplier"
+        },
+        {
+          "name": "items",
+          "target": "InvoiceItems",
+          "cardinality": "to-many",
+          "kind": "composition",
+          "backlink": "invoice",
+          "label": "Items"
+        }
+      ],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Supplier Invoice",
+          "typeNamePlural": "Supplier Invoices",
+          "titleField": "internalReference",
+          "descriptionField": "invoiceNumber"
+        },
+        "lineItem": ["internalReference", "invoiceNumber", "supplier", "status", "invoiceDate", "dueDate", "grossAmount", "currency"],
+        "selectionFields": ["status", "supplier", "invoiceDate"],
+        "fieldGroups": [
+          {
+            "id": "General",
+            "label": "General Information",
+            "fields": ["internalReference", "invoiceNumber", "invoiceDate", "dueDate", "status", "purchaseOrder"]
+          },
+          {
+            "id": "Amounts",
+            "label": "Amounts",
+            "fields": ["supplier", "netAmount", "taxAmount", "grossAmount", "currency"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "InvoiceItems",
+      "label": "Invoice Item",
+      "useCuid": true,
+      "useManaged": false,
+      "fields": [
+        { "name": "position", "type": "Integer", "label": "Position" },
+        { "name": "description", "type": "String", "length": 200, "label": "Description" },
+        { "name": "quantity", "type": "Decimal", "precision": 13, "scale": 3, "label": "Quantity" },
+        { "name": "unit", "type": "String", "length": 3, "label": "Unit" },
+        { "name": "unitPrice", "type": "Decimal", "precision": 15, "scale": 2, "label": "Unit Price" },
+        { "name": "amount", "type": "Decimal", "precision": 15, "scale": 2, "label": "Amount" }
+      ],
+      "relations": [
+        {
+          "name": "invoice",
+          "target": "SupplierInvoices",
+          "cardinality": "to-one",
+          "kind": "association",
+          "notNull": true
+        }
+      ],
+      "ui": {
+        "floorplan": "object-page-only",
+        "headerInfo": {
+          "typeName": "Invoice Item",
+          "typeNamePlural": "Invoice Items",
+          "titleField": "description",
+          "descriptionField": "position"
+        },
+        "lineItem": ["position", "description", "quantity", "unit", "unitPrice", "amount"],
+        "selectionFields": [],
+        "fieldGroups": []
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "InvoiceService",
+      "path": "invoice",
+      "requires": "authenticated-user",
+      "entities": [
+        { "entity": "SupplierInvoices", "draftEnabled": true, "readonly": false },
+        { "entity": "InvoiceItems", "draftEnabled": false, "readonly": false },
+        { "entity": "Suppliers", "draftEnabled": false, "readonly": true }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "id": "supinvoice",
+      "title": "Manage Supplier Invoices",
+      "description": "Capture supplier invoices for review",
+      "service": "InvoiceService",
+      "mainEntity": "SupplierInvoices"
+    }
+  ],
+  "sampleData": {
+    "Suppliers": [
+      {
+        "ID": "e5000001-0001-4000-8000-000000000001",
+        "name": "Office Supplies GmbH",
+        "country": "DE",
+        "vatNumber": "DE123456789",
+        "paymentTerms": "Net 30"
+      }
+    ],
+    "SupplierInvoices": [
+      {
+        "ID": "e5000001-0002-4000-8000-000000000001",
+        "internalReference": "SI-000001",
+        "invoiceNumber": "INV-77821",
+        "invoiceDate": "2026-08-01",
+        "dueDate": "2026-08-31",
+        "purchaseOrder": "4500012345",
+        "status": "IN_REVIEW",
+        "netAmount": "1000.00",
+        "taxAmount": "190.00",
+        "grossAmount": "1190.00",
+        "currency": "EUR",
+        "supplier_ID": "e5000001-0001-4000-8000-000000000001"
+      }
+    ],
+    "InvoiceItems": [
+      {
+        "ID": "e5000001-0003-4000-8000-000000000001",
+        "position": "10",
+        "description": "Printer paper A4",
+        "quantity": "20.000",
+        "unit": "BOX",
+        "unitPrice": "50.00",
+        "amount": "1000.00",
+        "invoice_ID": "e5000001-0002-4000-8000-000000000001"
+      }
+    ]
+  }
+}

@@ -1,0 +1,209 @@
+{
+  "namespace": "com.acme.pm",
+  "projectName": "maintenance-notification",
+  "description": "Plant maintenance notification capture",
+  "entities": [
+    {
+      "name": "Equipments",
+      "label": "Equipment",
+      "doc": "Technical objects (read-only)",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "equipmentNumber", "type": "String", "length": 18, "label": "Equipment Number", "notNull": true },
+        { "name": "description", "type": "String", "length": 120, "label": "Description" },
+        { "name": "plant", "type": "String", "length": 4, "label": "Plant" },
+        { "name": "functionalLocation", "type": "String", "length": 40, "label": "Functional Location" }
+      ],
+      "relations": [],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Equipment",
+          "typeNamePlural": "Equipments",
+          "titleField": "equipmentNumber",
+          "descriptionField": "description"
+        },
+        "lineItem": ["equipmentNumber", "description", "plant", "functionalLocation"],
+        "selectionFields": ["equipmentNumber", "plant"],
+        "fieldGroups": []
+      }
+    },
+    {
+      "name": "MaintenanceNotifications",
+      "label": "Maintenance Notification",
+      "useCuid": true,
+      "useManaged": true,
+      "fields": [
+        { "name": "notificationNumber", "type": "String", "length": 20, "label": "Notification Number", "notNull": true },
+        { "name": "title", "type": "String", "length": 120, "label": "Title" },
+        { "name": "description", "type": "LargeString", "label": "Description" },
+        {
+          "name": "priority",
+          "type": "String",
+          "length": 20,
+          "label": "Priority",
+          "enum": {
+            "LOW": "Low",
+            "MEDIUM": "Medium",
+            "HIGH": "High",
+            "EMERGENCY": "Emergency"
+          }
+        },
+        {
+          "name": "notificationType",
+          "type": "String",
+          "length": 20,
+          "label": "Type",
+          "enum": {
+            "BREAKDOWN": "Breakdown",
+            "PREVENTIVE": "Preventive",
+            "INSPECTION": "Inspection"
+          }
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "length": 20,
+          "label": "Status",
+          "enum": {
+            "DRAFT": "Draft",
+            "OPEN": "Open",
+            "IN_PROGRESS": "In Progress",
+            "COMPLETED": "Completed",
+            "CANCELLED": "Cancelled"
+          },
+          "default": "'DRAFT'"
+        },
+        { "name": "reportedBy", "type": "String", "length": 80, "label": "Reported By" },
+        { "name": "reportedDate", "type": "Date", "label": "Reported Date" }
+      ],
+      "relations": [
+        {
+          "name": "equipment",
+          "target": "Equipments",
+          "cardinality": "to-one",
+          "kind": "association",
+          "label": "Equipment"
+        },
+        {
+          "name": "items",
+          "target": "NotificationItems",
+          "cardinality": "to-many",
+          "kind": "composition",
+          "backlink": "notification",
+          "label": "Items"
+        }
+      ],
+      "ui": {
+        "floorplan": "list-report",
+        "headerInfo": {
+          "typeName": "Maintenance Notification",
+          "typeNamePlural": "Maintenance Notifications",
+          "titleField": "notificationNumber",
+          "descriptionField": "title"
+        },
+        "lineItem": ["notificationNumber", "title", "priority", "notificationType", "equipment", "status", "reportedDate"],
+        "selectionFields": ["status", "priority", "equipment"],
+        "fieldGroups": [
+          {
+            "id": "General",
+            "label": "General Information",
+            "fields": ["notificationNumber", "title", "description", "notificationType", "priority", "reportedBy", "reportedDate", "equipment"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "NotificationItems",
+      "label": "Notification Item",
+      "useCuid": true,
+      "useManaged": false,
+      "fields": [
+        { "name": "position", "type": "Integer", "label": "Position" },
+        { "name": "damageCode", "type": "String", "length": 20, "label": "Damage Code" },
+        { "name": "damageText", "type": "String", "length": 200, "label": "Damage Text" },
+        { "name": "causeText", "type": "String", "length": 200, "label": "Cause" },
+        { "name": "estimatedHours", "type": "Decimal", "precision": 7, "scale": 2, "label": "Estimated Hours" }
+      ],
+      "relations": [
+        {
+          "name": "notification",
+          "target": "MaintenanceNotifications",
+          "cardinality": "to-one",
+          "kind": "association",
+          "notNull": true
+        }
+      ],
+      "ui": {
+        "floorplan": "object-page-only",
+        "headerInfo": {
+          "typeName": "Notification Item",
+          "typeNamePlural": "Notification Items",
+          "titleField": "damageCode",
+          "descriptionField": "damageText"
+        },
+        "lineItem": ["position", "damageCode", "damageText", "causeText", "estimatedHours"],
+        "selectionFields": [],
+        "fieldGroups": []
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "MaintenanceService",
+      "path": "maintenance",
+      "requires": "authenticated-user",
+      "entities": [
+        { "entity": "MaintenanceNotifications", "draftEnabled": true, "readonly": false },
+        { "entity": "NotificationItems", "draftEnabled": false, "readonly": false },
+        { "entity": "Equipments", "draftEnabled": false, "readonly": true }
+      ]
+    }
+  ],
+  "apps": [
+    {
+      "id": "maintnotif",
+      "title": "Manage Maintenance Notifications",
+      "description": "Report and triage equipment failures",
+      "service": "MaintenanceService",
+      "mainEntity": "MaintenanceNotifications"
+    }
+  ],
+  "sampleData": {
+    "Equipments": [
+      {
+        "ID": "d4000001-0001-4000-8000-000000000001",
+        "equipmentNumber": "EQ-4711",
+        "description": "Conveyor line 3 motor",
+        "plant": "1000",
+        "functionalLocation": "PLANT1-LINE3"
+      }
+    ],
+    "MaintenanceNotifications": [
+      {
+        "ID": "d4000001-0002-4000-8000-000000000001",
+        "notificationNumber": "MN-000001",
+        "title": "Motor overheating",
+        "description": "Line 3 motor trips on thermal overload",
+        "priority": "HIGH",
+        "notificationType": "BREAKDOWN",
+        "status": "OPEN",
+        "reportedBy": "t.schmidt",
+        "reportedDate": "2026-08-05",
+        "equipment_ID": "d4000001-0001-4000-8000-000000000001"
+      }
+    ],
+    "NotificationItems": [
+      {
+        "ID": "d4000001-0003-4000-8000-000000000001",
+        "position": "10",
+        "damageCode": "D-HEAT",
+        "damageText": "Overheating",
+        "causeText": "Bearing wear suspected",
+        "estimatedHours": "4.00",
+        "notification_ID": "d4000001-0002-4000-8000-000000000001"
+      }
+    ]
+  }
+}
