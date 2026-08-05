@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from .compile import check_annotations, compile_project
 from .ir import AppModel
+from .normalize import normalize_model
 from .prompts import SYSTEM_PROMPT, build_repair_prompt, build_user_prompt
 from .providers import Provider, ProviderError
 from .validate import validate_model
@@ -95,7 +96,7 @@ def generate_project(
 
         # 1. Structural validation.
         try:
-            model = AppModel.model_validate(raw)
+            model = normalize_model(AppModel.model_validate(raw))
         except ValidationError as exc:
             errors = _format_validation_errors(exc)
             progress(f"  rejected by schema validation ({len(errors)} problems)")

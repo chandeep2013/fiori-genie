@@ -61,13 +61,24 @@ def _clean_diagnostics(output: str) -> List[str]:
         lowered = stripped.lower()
         if any(
             marker in lowered
-            for marker in ("error", "warning", "expected", ".cds:", "at line")
+            for marker in (
+                "error",
+                "warning",
+                "expected",
+                ".cds:",
+                "at line",
+                "has not been found",
+                "can't",
+                "cannot",
+                "invalid",
+            )
         ):
+            # Skip bare "Error:" headers with no detail.
+            if lowered in {"error:", "error", "warning:", "warning"}:
+                continue
             interesting.append(stripped)
 
     if interesting:
-        # Compiler diagnostics repeat context lines; cap the feedback so a
-        # cascade of errors from one root cause doesn't swamp the repair turn.
         return interesting[:40]
 
     return [line.strip() for line in output.splitlines() if line.strip()][:40]

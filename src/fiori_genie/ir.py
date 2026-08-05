@@ -106,6 +106,26 @@ class Field_(BaseModel):
     def _valid_name(cls, v: str) -> str:
         return _check_identifier(v, "Field name")
 
+    @field_validator("enum_values", mode="before")
+    @classmethod
+    def _coerce_enum(cls, v):
+        """Accept Gemini/OpenAI quirks: empty enum, or a plain list of codes."""
+        if v is None or v == {} or v == []:
+            return None
+        if isinstance(v, list):
+            coerced = {}
+            for item in v:
+                if isinstance(item, dict):
+                    code = str(item.get("code") or item.get("value") or item.get("name") or "")
+                    label = str(item.get("label") or item.get("title") or code)
+                else:
+                    code = str(item)
+                    label = code
+                if code:
+                    coerced[code] = label
+            return coerced or None
+        return v
+
     @model_validator(mode="after")
     def _check_facets(self) -> "Field_":
         if self.length is not None:

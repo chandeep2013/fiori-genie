@@ -51,7 +51,8 @@ readable labels as values. Codes must be valid identifiers.
 SERVICE RULES
 
 8. Expose entities through one service unless the spec clearly describes \
-separate consumers.
+separate consumers. Every service MUST include a non-empty `entities` \
+array naming each exposed entity with draftEnabled / readonly flags.
 
 9. Set `draftEnabled: true` only on the root entity users edit. A composition \
 child MUST have `draftEnabled: false` — CAP draft-enables children through the \
