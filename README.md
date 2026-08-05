@@ -50,11 +50,15 @@ cp .env.example .env              # then add one API key
 ## Use
 
 ```bash
-# Generate from a spec
-fiori-genie build specs/purchase-requisition.md -o ./generated
+# Generate from a spec — each run gets its own folder under generated/
+# (never overwrites a previous app)
+fiori-genie build specs/purchase-requisition.md
+# → generated/purchase-requisition
+fiori-genie build specs/travel-expense.md
+# → generated/travel-expense
 
-# Run the result
-cd generated && npm install && npm run watch
+# Run one of them
+cd generated/travel-expense && npm install && npx cds serve --port 4004
 # then open http://localhost:4004/launchpad.html
 ```
 

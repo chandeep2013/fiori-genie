@@ -57,6 +57,13 @@
                             visible="{= !!${app>/message} }"
                             class="sapUiSmallMarginBottom"/>
 
+                        <ObjectStatus
+                            title="Output folder"
+                            text="{app>/outputPath}"
+                            state="Information"
+                            visible="{= !!${app>/outputPath} }"
+                            class="sapUiSmallMarginBottom"/>
+
                         <Panel headerText="{i18n>specTitle}" expandable="false" width="100%">
                             <VBox>
                                 <TextArea

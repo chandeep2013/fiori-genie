@@ -16,6 +16,7 @@ from rich.table import Table
 
 from .compile import compile_project, find_cds
 from .ir import AppModel
+from .paths import allocate_output_dir
 from .pipeline import generate_project
 from .providers import ProviderError, get_provider
 from .render import render_project
@@ -52,8 +53,16 @@ def _report_files(files, out_dir: Path) -> None:
 @app.command()
 def build(
     spec: Path = typer.Argument(..., help="Functional spec (markdown or plain text)"),
-    out: Path = typer.Option(Path("./generated"), "--out", "-o", help="Output directory"),
-    provider: Optional[str] = typer.Option(None, help="anthropic | openai | genai-hub"),
+    out: Optional[Path] = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Output directory. Default: generated/<project-name>. "
+        "Never overwrites an existing folder — a timestamped sibling is used.",
+    ),
+    provider: Optional[str] = typer.Option(
+        None, help="demo | gemini | anthropic | openai | genai-hub"
+    ),
     model: Optional[str] = typer.Option(None, help="Override the model name"),
     name: Optional[str] = typer.Option(None, help="Project name for the generated app"),
     attempts: int = typer.Option(3, help="Maximum generate/repair attempts"),
@@ -74,11 +83,22 @@ def build(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1)
 
+    hint = name or spec.stem
+    if out is None:
+        out_dir = allocate_output_dir(hint)
+    elif out.exists():
+        out_dir = allocate_output_dir(hint, root=out.parent if out.parent != Path("") else Path("generated"))
+        console.print(
+            f"[yellow]{out} already exists — writing to {out_dir} instead[/yellow]"
+        )
+    else:
+        out_dir = out
+
     console.print(
         Panel(
             f"spec:     {spec}\n"
             f"provider: {llm.name} ({llm.model})\n"
-            f"output:   {out}",
+            f"output:   {out_dir}",
             title="fiori-genie",
             expand=False,
         )
@@ -86,7 +106,7 @@ def build(
 
     result = generate_project(
         spec_text=spec.read_text(encoding="utf-8"),
-        out_dir=out,
+        out_dir=out_dir,
         provider=llm,
         project_name=name,
         max_attempts=attempts,
@@ -104,7 +124,7 @@ def build(
         raise typer.Exit(1)
 
     console.print(f"\n[green]Success[/green] after {len(result.attempts)} attempt(s).")
-    _report_files(result.files, out)
+    _report_files(result.files, out_dir)
 
     if result.warnings:
         console.print("\n[yellow]Compiler warnings:[/yellow]")
@@ -120,14 +140,20 @@ def build(
         console.print(f"\nIntermediate model saved to {save_model}")
 
     console.print(
-        f"\nNext:\n  cd {out}\n  npm install\n  npm run watch"
+        f"\nNext:\n  cd {out_dir}\n  npm install\n  npx cds serve --port 4004\n"
+        f"  # then open /launchpad.html"
     )
 
 
 @app.command()
 def render(
     model_file: Path = typer.Argument(..., help="An intermediate model JSON file"),
-    out: Path = typer.Option(Path("./generated"), "--out", "-o"),
+    out: Optional[Path] = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Output directory. Default: generated/<project-name> (never overwrites).",
+    ),
     compile_check: bool = typer.Option(True, "--compile/--no-compile"),
 ):
     """Render a project from an existing model, without calling an LLM."""
@@ -140,11 +166,21 @@ def render(
             console.print(f"  [red]-[/red] {error}")
         raise typer.Exit(1)
 
-    files = render_project(model, out)
-    _report_files(files, out)
+    if out is None:
+        out_dir = allocate_output_dir(model.project_name)
+    elif out.exists():
+        out_dir = allocate_output_dir(model.project_name, root=out.parent)
+        console.print(
+            f"[yellow]{out} already exists — writing to {out_dir} instead[/yellow]"
+        )
+    else:
+        out_dir = out
+
+    files = render_project(model, out_dir)
+    _report_files(files, out_dir)
 
     if compile_check:
-        ok, diagnostics = compile_project(out)
+        ok, diagnostics = compile_project(out_dir)
         if ok:
             console.print("[green]cds compile passed.[/green]")
         else:
@@ -152,6 +188,10 @@ def render(
             for line in diagnostics:
                 console.print(f"  [red]-[/red] {line}")
             raise typer.Exit(1)
+
+    console.print(
+        f"\nNext:\n  cd {out_dir}\n  npm install\n  npx cds serve --port 4004"
+    )
 
 
 @app.command()

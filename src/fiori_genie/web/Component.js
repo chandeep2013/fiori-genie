@@ -22,6 +22,7 @@ sap.ui.define(
                         providerLabel: "checking...",
                         hasResult: false,
                         runId: null,
+                        outputPath: null,
                         entities: [],
                         services: [],
                         files: [],

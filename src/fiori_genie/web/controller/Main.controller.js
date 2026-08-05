@@ -81,6 +81,7 @@ sap.ui.define(
                 var model = this._model;
                 model.setProperty("/hasResult", false);
                 model.setProperty("/runId", null);
+                model.setProperty("/outputPath", null);
                 model.setProperty("/entities", []);
                 model.setProperty("/services", []);
                 model.setProperty("/files", []);
@@ -166,15 +167,23 @@ sap.ui.define(
                 }
 
                 model.setProperty("/runId", payload.runId);
+                model.setProperty("/outputPath", payload.outputPath || null);
                 model.setProperty("/files", payload.files || []);
                 model.setProperty("/entities", this._toDesign(payload.model));
                 model.setProperty("/services", this._toServices(payload.model));
                 model.setProperty("/hasResult", true);
+                var where = payload.outputPath
+                    ? " Saved to " + payload.outputPath + "."
+                    : "";
                 model.setProperty(
                     "/message",
                     "Generated " +
                         (payload.files || []).length +
-                        " files. The CDS compiler accepted the model."
+                        " files." +
+                        where +
+                        " Run: cd " +
+                        (payload.outputPath || "generated/<app>") +
+                        " && npm install && npx cds serve --port 4004"
                 );
                 model.setProperty("/messageType", "Success");
 
