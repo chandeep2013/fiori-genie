@@ -4,11 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>fiori-genie</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        #container, #container-uiarea {
+            height: 100%;
+        }
+    </style>
     <script
         id="sap-ui-bootstrap"
         src="https://ui5.sap.com/1.120.0/resources/sap-ui-core.js"
         data-sap-ui-theme="sap_horizon"
-        data-sap-ui-libs="sap.m,sap.ui.core,sap.ui.layout,sap.ui.codeeditor,sap.f"
+        data-sap-ui-libs="sap.m,sap.ui.core,sap.ui.layout,sap.ui.codeeditor"
         data-sap-ui-compat-version="edge"
         data-sap-ui-async="true"
         data-sap-ui-frame-options="trusted"
@@ -16,7 +25,7 @@
         data-sap-ui-on-init="module:sap/ui/core/ComponentSupport">
     </script>
 </head>
-<body class="sapUiBody">
+<body class="sapUiBody sapUiSizeCompact">
     <div
         data-sap-ui-component
         data-name="fiorigenie"
@@ -26,3 +35,4 @@
     </div>
 </body>
 </html>
+

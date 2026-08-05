@@ -31,8 +31,7 @@
         "sap.m": {},
         "sap.ui.core": {},
         "sap.ui.layout": {},
-        "sap.ui.codeeditor": {},
-        "sap.f": {}
+        "sap.ui.codeeditor": {}
       }
     },
     "models": {
