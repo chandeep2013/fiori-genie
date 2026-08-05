@@ -80,7 +80,18 @@ def _file_payload(root: Path) -> List[Dict]:
 def status() -> Dict:
     try:
         provider = get_provider()
-        return {"providerReady": True, "provider": provider.name, "model": provider.model}
+        detail = None
+        if provider.name == "demo":
+            detail = (
+                "Using offline demo provider (sample purchase-requisition model). "
+                "Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env for real generation."
+            )
+        return {
+            "providerReady": True,
+            "provider": provider.name,
+            "model": provider.model,
+            "detail": detail,
+        }
     except ProviderError as exc:
         return {"providerReady": False, "provider": None, "model": None, "detail": str(exc)}
 

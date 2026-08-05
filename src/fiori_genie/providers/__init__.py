@@ -35,7 +35,8 @@ def get_provider(
     name = (name or os.getenv("FIORI_GENIE_PROVIDER") or "").lower().strip()
 
     if not name:
-        # Infer from whichever credential is present.
+        # Infer from whichever credential is present. Fall back to the offline
+        # demo provider so Generate works without a paid API key.
         if os.getenv("ANTHROPIC_API_KEY"):
             name = "anthropic"
         elif os.getenv("OPENAI_API_KEY"):
@@ -43,12 +44,12 @@ def get_provider(
         elif os.getenv("AICORE_CLIENT_ID"):
             name = "genai-hub"
         else:
-            raise ProviderError(
-                "No LLM provider configured. Set ANTHROPIC_API_KEY or "
-                "OPENAI_API_KEY in your environment or .env file, or pass "
-                "--provider explicitly. See .env.example."
-            )
+            name = "demo"
 
+    if name == "demo":
+        from .demo_provider import DemoProvider
+
+        return DemoProvider(model=model)
     if name == "anthropic":
         from .anthropic_provider import AnthropicProvider
 
@@ -63,7 +64,7 @@ def get_provider(
         return GenAIHubProvider(model=model)
 
     raise ProviderError(
-        f"Unknown provider '{name}'. Supported: anthropic, openai, genai-hub."
+        f"Unknown provider '{name}'. Supported: demo, anthropic, openai, genai-hub."
     )
 
 

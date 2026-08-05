@@ -42,9 +42,12 @@ sap.ui.define(
                                 ? status.provider + " · " + status.model
                                 : "No LLM provider configured"
                         );
-                        if (!status.providerReady) {
+                        if (status.detail) {
                             model.setProperty("/message", status.detail);
-                            model.setProperty("/messageType", "Warning");
+                            model.setProperty(
+                                "/messageType",
+                                status.provider === "demo" ? "Information" : "Warning"
+                            );
                         }
                     })
                     .catch(function () {
