@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import Dict, List, Set
 
-from .ir import AppModel, Cardinality, ExposedEntity, RelationKind, Service
+from .ir import AppModel, Cardinality, RelationKind
+
+# Models sometimes invent a second OData service named after the IR field
+# `entities`. That is not a real consumer — drop it before render/compile.
+_BOGUS_SERVICE_NAMES = frozenset({"entities", "entity", "db", "schema", "service", "services"})
 
 
 def _composition_children(model: AppModel) -> Set[str]:
@@ -30,12 +34,65 @@ def _referenced_targets(model: AppModel) -> Set[str]:
     return targets - composers - _composition_children(model)
 
 
+def _exposure_key(item: Dict) -> str:
+    return str(item.get("as") or item.get("entity") or "")
+
+
+def _collapse_services(data: Dict) -> None:
+    """Drop confused/unused extra services Gemini often invents."""
+    services: List[Dict] = list(data.get("services") or [])
+    if not services:
+        return
+
+    services = [
+        s for s in services if str(s.get("name") or "").lower() not in _BOGUS_SERVICE_NAMES
+    ]
+    if not services:
+        # All services were bogus — leave empty; validation will ask for one.
+        data["services"] = []
+        return
+
+    if len(services) == 1:
+        data["services"] = services
+        return
+
+    app_names = {
+        a.get("service")
+        for a in (data.get("apps") or [])
+        if isinstance(a, dict) and a.get("service")
+    }
+    preferred = [s for s in services if s.get("name") in app_names]
+    if not preferred:
+        preferred = [
+            max(services, key=lambda s: len(s.get("entities") or []))
+        ]
+
+    keep = preferred[0]
+    seen = {_exposure_key(e) for e in (keep.get("entities") or []) if _exposure_key(e)}
+    for other in services:
+        if other.get("name") == keep.get("name"):
+            continue
+        for item in other.get("entities") or []:
+            key = _exposure_key(item)
+            if key and key not in seen:
+                keep.setdefault("entities", []).append(item)
+                seen.add(key)
+
+    for app in data.get("apps") or []:
+        if isinstance(app, dict) and app.get("service") != keep.get("name"):
+            app["service"] = keep["name"]
+
+    data["services"] = [keep]
+
+
 def normalize_model(model: AppModel) -> AppModel:
     """Repair common LLM omissions without changing a sound model."""
     data = model.model_dump(by_alias=True)
     children = _composition_children(model)
     references = _referenced_targets(model)
     known = {e.name for e in model.entities}
+
+    _collapse_services(data)
 
     for service in data.get("services") or []:
         requires = service.get("requires")

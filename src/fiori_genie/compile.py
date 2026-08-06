@@ -54,11 +54,18 @@ def _clean_diagnostics(output: str) -> List[str]:
     """Keep the lines that describe problems, drop progress noise."""
     output = ANSI_RE.sub("", output)
     interesting = []
+    capture_following = False
     for line in output.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
         lowered = stripped.lower()
+        # Skip stack frames; keep the human-readable diagnostic block.
+        if lowered.startswith("at ") and ("/" in stripped or "(" in stripped):
+            continue
+        if lowered in {"error:", "error", "warning:", "warning"}:
+            capture_following = True
+            continue
         if any(
             marker in lowered
             for marker in (
@@ -71,12 +78,14 @@ def _clean_diagnostics(output: str) -> List[str]:
                 "can't",
                 "cannot",
                 "invalid",
+                "multiple service",
+                "please choose",
+                "-s ",
             )
-        ):
-            # Skip bare "Error:" headers with no detail.
-            if lowered in {"error:", "error", "warning:", "warning"}:
-                continue
+        ) or capture_following:
             interesting.append(stripped)
+            # Keep collecting the multi-line "please choose -s …" block.
+            capture_following = lowered.startswith("-s ") or "please choose" in lowered
 
     if interesting:
         return interesting[:40]
@@ -132,9 +141,22 @@ def check_annotations(project_dir: Path, cds_bin: Optional[str] = None) -> Tuple
     if not roots:
         return True, []
 
+    # EDMX requires an explicit service when the model defines more than one
+    # (`cds compile --to edmx` otherwise exits with "Found multiple service
+    # definitions"). `-s all` emits every service in one pass.
     try:
         result = subprocess.run(
-            [cds_bin, "compile", *roots, "--to", "edmx", "--odata-version", "v4"],
+            [
+                cds_bin,
+                "compile",
+                *roots,
+                "--to",
+                "edmx",
+                "--odata-version",
+                "v4",
+                "-s",
+                "all",
+            ],
             cwd=str(project_dir),
             capture_output=True,
             text=True,

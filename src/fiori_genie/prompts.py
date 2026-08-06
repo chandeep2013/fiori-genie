@@ -50,9 +50,12 @@ readable labels as values. Codes must be valid identifiers.
 
 SERVICE RULES
 
-8. Expose entities through one service unless the spec clearly describes \
-separate consumers. Every service MUST include a non-empty `entities` \
-array naming each exposed entity with draftEnabled / readonly flags.
+8. Expose domain entities through exactly one OData service unless the spec \
+clearly describes separate consumers. Every service MUST include a non-empty \
+`entities` array naming each exposed entity with draftEnabled / readonly \
+flags. Never create a service named `entities`, `entity`, `db`, or `schema` \
+— those words refer to model fields / CDS folders, not service names. Prefer \
+a name like `TravelService` or `ExpenseService`.
 
 9. Set `draftEnabled: true` only on the root entity users edit. A composition \
 child MUST have `draftEnabled: false` — CAP draft-enables children through the \
@@ -129,10 +132,20 @@ def build_repair_prompt(errors: List[str], stage: str) -> str:
             "The model you produced failed validation. These are the problems:"
         )
 
+    hint = ""
+    joined = "\n".join(errors).lower()
+    if "multiple service" in joined:
+        hint = (
+            "\n\nIf the compiler reported multiple service definitions, keep "
+            "exactly one OData service (the one the Fiori app uses). Do not "
+            "emit a second service named `entities`."
+        )
+
     return (
         f"{preamble}\n\n{listing}\n\n"
         "Produce a corrected application model. Return the complete model, not "
         "a patch, and change only what is needed to resolve these problems."
+        f"{hint}"
     )
 
 
