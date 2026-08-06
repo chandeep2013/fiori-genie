@@ -8,6 +8,7 @@ template markup.
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from ..ir import Cardinality, CdsType, Entity, Field_, Relation, RelationKind, Service
 
@@ -22,6 +23,46 @@ def type_expr(field: Field_) -> str:
     if field.type is CdsType.Decimal:
         return f"Decimal({field.precision}, {field.scale})"
     return field.type.value
+
+
+def default_expr(field: Field_) -> Optional[str]:
+    """Turn an IR default into a CDS constant expression.
+
+    Models often emit bare codes like `DRAFT`. CDS needs `'DRAFT'` or `#DRAFT`.
+    """
+    if field.default is None:
+        return None
+    value = str(field.default).strip()
+    if not value:
+        return None
+
+    if value.startswith("#"):
+        return value
+    if value.startswith("'") and value.endswith("'") and len(value) >= 2:
+        return value
+    if value in {"true", "false", "null"}:
+        return value
+    if re.fullmatch(r"-?\d+(\.\d+)?", value):
+        return value
+
+    # JSON-style double quotes: "DRAFT"
+    if value.startswith('"') and value.endswith('"') and len(value) >= 2:
+        return f"'{cds_str(value[1:-1])}'"
+
+    # Bare enum symbol — prefer the #CODE form CAP documents for enums.
+    if field.enum_values and value in field.enum_values:
+        return f"#{value}"
+
+    # Case-insensitive match on enum codes (Gemini sometimes sends Draft).
+    if field.enum_values:
+        for code in field.enum_values:
+            if code.lower() == value.lower():
+                return f"#{code}"
+
+    if field.type is CdsType.String:
+        return f"'{cds_str(value)}'"
+
+    return value
 
 
 def field_decl(field: Field_, indent: int = 2) -> str:
@@ -41,8 +82,9 @@ def field_decl(field: Field_, indent: int = 2) -> str:
         )
         parts.append(f"enum {{{symbols}\n{' ' * indent}}}")
 
-    if field.default is not None:
-        parts.append(f"default {field.default}")
+    default = default_expr(field)
+    if default is not None:
+        parts.append(f"default {default}")
     if field.not_null:
         parts.append("not null")
 
@@ -113,6 +155,7 @@ def register(env) -> None:
     env.globals.update(
         type_expr=type_expr,
         field_decl=field_decl,
+        default_expr=default_expr,
         relation_decl=relation_decl,
         aspects=aspects,
         service_options=service_options,

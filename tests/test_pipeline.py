@@ -195,6 +195,28 @@ class TestRenderedOutput:
         assert "enum {" in schema
         assert "} default 'DRAFT';" in schema
 
+    def test_bare_enum_default_is_normalized(self, tmp_path: Path):
+        """Gemini often emits default: DRAFT without quotes — CDS rejects that."""
+        from fiori_genie.render.cds import default_expr, field_decl
+
+        raw = json.loads(FIXTURE.read_text())
+        for entity in raw["entities"]:
+            for field in entity.get("fields", []):
+                if field.get("name") == "status":
+                    field["default"] = "DRAFT"
+
+        model = AppModel.model_validate(raw)
+        status = next(
+            f for e in model.entities for f in e.fields if f.name == "status"
+        )
+        assert default_expr(status) == "#DRAFT"
+        assert "default #DRAFT" in field_decl(status)
+
+        render_project(model, tmp_path)
+        if cds_available():
+            ok, diagnostics = compile_project(tmp_path)
+            assert ok, diagnostics
+
     def test_sample_csv_header_matches_columns(self, rendered: Path):
         csv_path = rendered / "db/data/com.acme.procurement-PurchaseRequisitions.csv"
         header = csv_path.read_text().splitlines()[0].split(",")

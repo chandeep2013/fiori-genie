@@ -96,7 +96,11 @@ class Field_(BaseModel):
     scale: Optional[int] = None
 
     default: Optional[str] = Field(
-        default=None, description="Literal default, rendered verbatim into CDS"
+        default=None,
+        description=(
+            "CDS default expression. Prefer \"'DRAFT'\" or \"#DRAFT\" for enums; "
+            "bare DRAFT is accepted but normalized."
+        ),
     )
     # Rendered as an inline enum. Keys are technical codes, values are labels.
     enum_values: Optional[Dict[str, str]] = Field(default=None, alias="enum")

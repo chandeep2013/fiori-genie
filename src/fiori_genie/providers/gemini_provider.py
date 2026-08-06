@@ -8,6 +8,7 @@ schema before asking for structured JSON.
 from __future__ import annotations
 
 import copy
+import concurrent.futures
 import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
@@ -17,6 +18,7 @@ from . import ProviderError
 # Prefer the floating alias so new AI Studio keys keep working as Google
 # retires numbered flash models for new accounts.
 DEFAULT_MODEL = "gemini-flash-latest"
+DEFAULT_TIMEOUT_S = 120
 
 # Keys Gemini rejects when used as JSON Schema *metadata*.
 # Do not strip these when they appear as property names under "properties".
@@ -59,6 +61,14 @@ def _sanitize_schema(node: Any, *, in_properties: bool = False) -> Any:
     if isinstance(node, list):
         return [_sanitize_schema(item, in_properties=False) for item in node]
     return node
+
+
+def _request_timeout_s() -> float:
+    raw = os.getenv("FIORI_GENIE_LLM_TIMEOUT_S", str(DEFAULT_TIMEOUT_S))
+    try:
+        return max(30.0, float(raw))
+    except ValueError:
+        return float(DEFAULT_TIMEOUT_S)
 
 
 def _max_output_tokens() -> int:
@@ -149,6 +159,7 @@ class GeminiProvider:
         self.model = model or os.getenv("FIORI_GENIE_MODEL") or DEFAULT_MODEL
         self._client = genai.Client(api_key=api_key)
         self.max_output_tokens = _max_output_tokens()
+        self.timeout_s = _request_timeout_s()
 
     def generate(self, system: str, messages: List[Dict], schema: Dict) -> Dict:
         from google.genai import types
@@ -226,40 +237,53 @@ class GeminiProvider:
         *,
         with_schema: bool,
     ) -> Any:
-        try:
-            config_kwargs: Dict[str, Any] = {
-                "system_instruction": system,
-                "response_mime_type": "application/json",
-                "temperature": 0.2,
-                "max_output_tokens": self.max_output_tokens,
-            }
-            if with_schema:
-                config_kwargs["response_json_schema"] = clean_schema
-            return self._client.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=types.GenerateContentConfig(**config_kwargs),
-            )
-        except Exception as exc:
-            message = str(exc)
-            if with_schema and (
-                "INVALID_ARGUMENT" in message or "additionalProperties" in message
-            ):
-                try:
-                    return self._client.models.generate_content(
-                        model=self.model,
-                        contents=contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=(
-                                system
-                                + "\n\nRespond with ONLY a JSON object that matches "
-                                "the application model schema. No markdown fences."
+        def _invoke() -> Any:
+            try:
+                config_kwargs: Dict[str, Any] = {
+                    "system_instruction": system,
+                    "response_mime_type": "application/json",
+                    "temperature": 0.2,
+                    "max_output_tokens": self.max_output_tokens,
+                }
+                if with_schema:
+                    config_kwargs["response_json_schema"] = clean_schema
+                return self._client.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(**config_kwargs),
+                )
+            except Exception as exc:
+                message = str(exc)
+                if with_schema and (
+                    "INVALID_ARGUMENT" in message or "additionalProperties" in message
+                ):
+                    try:
+                        return self._client.models.generate_content(
+                            model=self.model,
+                            contents=contents,
+                            config=types.GenerateContentConfig(
+                                system_instruction=(
+                                    system
+                                    + "\n\nRespond with ONLY a JSON object that matches "
+                                    "the application model schema. No markdown fences."
+                                ),
+                                response_mime_type="application/json",
+                                temperature=0.2,
+                                max_output_tokens=self.max_output_tokens,
                             ),
-                            response_mime_type="application/json",
-                            temperature=0.2,
-                            max_output_tokens=self.max_output_tokens,
-                        ),
-                    )
-                except Exception as retry_exc:
-                    raise ProviderError(f"Gemini request failed: {retry_exc}") from retry_exc
-            raise ProviderError(f"Gemini request failed: {exc}") from exc
+                        )
+                    except Exception as retry_exc:
+                        raise ProviderError(
+                            f"Gemini request failed: {retry_exc}"
+                        ) from retry_exc
+                raise ProviderError(f"Gemini request failed: {exc}") from exc
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(_invoke)
+            try:
+                return future.result(timeout=self.timeout_s)
+            except concurrent.futures.TimeoutError as exc:
+                raise ProviderError(
+                    f"Gemini timed out after {int(self.timeout_s)}s. "
+                    "Check VPN/network, or raise FIORI_GENIE_LLM_TIMEOUT_S."
+                ) from exc

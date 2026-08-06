@@ -46,7 +46,9 @@ never `Double`. Amounts are typically `Decimal(15, 2)`; quantities \
 labels in the UI, so write them the way a business user would say them.
 
 7. Status-like fields should use `enum` with UPPER_SNAKE codes as keys and \
-readable labels as values. Codes must be valid identifiers.
+readable labels as values. Codes must be valid identifiers. If you set \
+`default`, use a quoted CDS literal such as "'DRAFT'" or the enum form \
+"#DRAFT" — never a bare code like "DRAFT", which the CDS compiler rejects.
 
 SERVICE RULES
 
@@ -140,6 +142,12 @@ def build_repair_prompt(errors: List[str], stage: str) -> str:
             "\n\nIf the compiler reported multiple service definitions, keep "
             "exactly one OData service (the one the Fiori app uses). Do not "
             "emit a second service named `entities`."
+        )
+    elif "constant expression" in joined or "variable is expected" in joined:
+        hint = (
+            "\n\nIf a field default failed CDS compile, set default to a quoted "
+            "literal like \"'DRAFT'\" or an enum symbol like \"#DRAFT\". Do not "
+            "use a bare code such as \"DRAFT\"."
         )
 
     return (

@@ -95,9 +95,18 @@ sap.ui.define(
             onGenerate: function () {
                 var model = this._model;
                 var that = this;
+                var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+                // Server LLM calls can take a few minutes; fail the spinner if stuck.
+                var timeoutMs = 6 * 60 * 1000;
+                var timer = controller
+                    ? setTimeout(function () {
+                          controller.abort();
+                      }, timeoutMs)
+                    : null;
 
                 this._reset();
                 model.setProperty("/busy", true);
+                model.setProperty("/busyText", "Generating — this can take 1–3 minutes…");
 
                 fetch("api/generate", {
                     method: "POST",
@@ -106,7 +115,8 @@ sap.ui.define(
                         spec: model.getProperty("/spec"),
                         projectName: model.getProperty("/projectName") || null,
                         attempts: model.getProperty("/attempts")
-                    })
+                    }),
+                    signal: controller ? controller.signal : undefined
                 })
                     .then(function (response) {
                         return response.json().then(function (body) {
@@ -115,6 +125,7 @@ sap.ui.define(
                     })
                     .then(function (result) {
                         model.setProperty("/busy", false);
+                        model.setProperty("/busyText", "");
 
                         if (!result.ok) {
                             that._fail(result.body.detail || "Request failed");
@@ -124,7 +135,19 @@ sap.ui.define(
                     })
                     .catch(function (error) {
                         model.setProperty("/busy", false);
+                        model.setProperty("/busyText", "");
+                        if (error && error.name === "AbortError") {
+                            that._fail(
+                                "Generation timed out after 6 minutes. Check the BAS terminal for Gemini/VPN errors, then retry."
+                            );
+                            return;
+                        }
                         that._fail(String(error));
+                    })
+                    .finally(function () {
+                        if (timer) {
+                            clearTimeout(timer);
+                        }
                     });
             },
 
