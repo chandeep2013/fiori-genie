@@ -25,6 +25,22 @@ from .validate import validate_model
 
 Progress = Callable[[str], None]
 
+_FATAL_PROVIDER_MARKERS = (
+    "is not set",
+    "not installed",
+    "unknown provider",
+    "401",
+    "403",
+    "permission denied",
+    "api key",
+    "authentication",
+)
+
+
+def _is_fatal_provider_error(exc: ProviderError) -> bool:
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _FATAL_PROVIDER_MARKERS)
+
 
 @dataclass
 class Attempt:
@@ -91,8 +107,27 @@ def generate_project(
         try:
             raw = provider.generate(SYSTEM_PROMPT, messages, schema)
         except ProviderError as exc:
-            attempts.append(Attempt(number, "parse", [str(exc)]))
-            return Result(False, None, [], attempts, None)
+            errors = [str(exc)]
+            progress(f"  provider error: {exc}")
+            attempts.append(Attempt(number, "parse", errors))
+            if _is_fatal_provider_error(exc) or number >= max_attempts:
+                return Result(False, None, [], attempts, None)
+            # Truncated / empty Gemini JSON is retryable — ask for a smaller model.
+            messages += [
+                {
+                    "role": "assistant",
+                    "content": "(previous response was empty, truncated, or invalid JSON)",
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        build_repair_prompt(errors, "validate")
+                        + "\n\nEmit a COMPLETE smaller JSON model: at most 2 "
+                        "sampleData rows per entity, short labels, no long docs."
+                    ),
+                },
+            ]
+            continue
 
         # 1. Structural validation.
         try:

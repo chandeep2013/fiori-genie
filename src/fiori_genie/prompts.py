@@ -87,8 +87,9 @@ a UI list.
 
 SAMPLE DATA
 
-16. Provide two to four realistic rows per entity. Realistic means plausible \
-business content in the spec's domain, not "Test 1" and "Foo".
+16. Provide exactly two realistic rows per entity (keep the JSON small — long \
+sampleData is the main cause of truncated model responses). Realistic means \
+plausible business content in the spec's domain, not "Test 1" and "Foo".
 
 17. Every row of an entity with `useCuid` must include an explicit `ID` holding \
 a valid UUID string. Reference a parent with the foreign key column \
