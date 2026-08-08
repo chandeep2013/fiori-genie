@@ -15,9 +15,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import ProviderError
 
-# Prefer the floating alias so new AI Studio keys keep working as Google
-# retires numbered flash models for new accounts.
-DEFAULT_MODEL = "gemini-flash-latest"
+# Prefer the lite floating alias: free-tier accounts often exhaust the main
+# Flash quota while flash-lite still has capacity.
+DEFAULT_MODEL = "gemini-flash-lite-latest"
 DEFAULT_TIMEOUT_S = 120
 
 # Keys Gemini rejects when used as JSON Schema *metadata*.
@@ -194,7 +194,7 @@ class GeminiProvider:
                 "Gemini returned an empty response"
                 + (f" (finish_reason={finish})" if finish else "")
                 + ". The free tier may be rate-limited — wait a minute and retry, "
-                "or set FIORI_GENIE_MODEL=gemini-2.0-flash."
+                "or set FIORI_GENIE_MODEL=gemini-flash-lite-latest."
             )
 
         hint = ""
@@ -274,9 +274,9 @@ class GeminiProvider:
                         )
                     except Exception as retry_exc:
                         raise ProviderError(
-                            f"Gemini request failed: {retry_exc}"
+                            _friendly_gemini_error(retry_exc)
                         ) from retry_exc
-                raise ProviderError(f"Gemini request failed: {exc}") from exc
+                raise ProviderError(_friendly_gemini_error(exc)) from exc
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(_invoke)
@@ -287,3 +287,35 @@ class GeminiProvider:
                     f"Gemini timed out after {int(self.timeout_s)}s. "
                     "Check VPN/network, or raise FIORI_GENIE_LLM_TIMEOUT_S."
                 ) from exc
+
+
+def _friendly_gemini_error(exc: Exception) -> str:
+    """Map Google quota/auth failures to actionable guidance."""
+    message = str(exc)
+    lowered = message.lower()
+    if any(
+        marker in lowered
+        for marker in (
+            "resource_exhausted",
+            "quota",
+            "rate limit",
+            "429",
+            "exceeded your current quota",
+        )
+    ):
+        return (
+            "Gemini quota exceeded (this is per Google project / day, not per API key). "
+            "A new key in the same AI Studio project usually does not reset the limit. "
+            "Options: wait for the daily reset; create a key in a brand-new Google Cloud "
+            "project at https://aistudio.google.com/apikey; try "
+            "FIORI_GENIE_MODEL=gemini-flash-lite-latest; or set FIORI_GENIE_PROVIDER=demo for "
+            "offline sample-spec generation. Original error: "
+            f"{message}"
+        )
+    if "not available in your country" in lowered or "failed_precondition" in lowered:
+        return (
+            "Gemini free tier is not available for this project/region. "
+            "Enable billing in Google AI Studio, or use FIORI_GENIE_PROVIDER=demo. "
+            f"Original error: {message}"
+        )
+    return f"Gemini request failed: {message}"

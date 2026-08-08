@@ -8,6 +8,7 @@ from fiori_genie.pipeline import _is_fatal_provider_error
 from fiori_genie.providers import ProviderError
 from fiori_genie.providers.gemini_provider import (
     _extract_payload,
+    _friendly_gemini_error,
     _looks_truncated,
     _strip_fences,
 )
@@ -51,3 +52,11 @@ def test_fatal_provider_errors():
     assert not _is_fatal_provider_error(
         ProviderError("Gemini returned unparseable JSON: Unterminated string")
     )
+
+
+def test_friendly_quota_error():
+    msg = _friendly_gemini_error(
+        RuntimeError("429 RESOURCE_EXHAUSTED Quota exceeded for metric")
+    )
+    assert "per Google project" in msg
+    assert "demo" in msg

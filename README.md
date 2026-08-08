@@ -106,7 +106,7 @@ Set one credential in `.env`; the provider is inferred (or set
 - **Google AI Studio / Gemini** — best unpaid path. Create a key at
   [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then
   `pip install google-genai` and set `GEMINI_API_KEY` + `FIORI_GENIE_PROVIDER=gemini`.
-  Default model: `gemini-flash-latest`.
+  Default model: `gemini-flash-lite-latest` (main Flash often hits free-tier quota).
 - **demo** — offline; matches sample specs to built-in fixtures (no LLM).
 - **Anthropic or OpenAI** — paid / credit-based; forced tool calls for structured IR.
 - **SAP Generative AI Hub** — BTP-native; implemented but not verified on a live tenant.

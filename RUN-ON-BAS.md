@@ -62,7 +62,7 @@ Edit `.env` (use Gemini for unpaid generation):
 ```bash
 GEMINI_API_KEY=your-key-here
 FIORI_GENIE_PROVIDER=gemini
-FIORI_GENIE_MODEL=gemini-flash-latest
+FIORI_GENIE_MODEL=gemini-flash-lite-latest
 ```
 
 For offline demo only (no API key; matches sample specs to fixtures):
@@ -187,7 +187,7 @@ Both ports must be **exposed** in BAS or the browser cannot reach them.
 | Basic-auth popup on the CAP app | Expected if profile/auth is wrong; generated apps use dummy auth under development — restart with `npx cds serve --port 4004` from the generated folder |
 | List opens but object page does not | Open `/launchpad.html`, not `.../webapp/index.html` |
 | Second generate overwrote the first | Pull latest branch; each run writes `generated/<project-name>` or a timestamped sibling |
-| Gemini / API errors | Check `.env` key; try `FIORI_GENIE_MODEL=gemini-2.0-flash`; or use `FIORI_GENIE_PROVIDER=demo` with sample specs |
+| Gemini / API errors | Quota is per Google project, not per key. Try `FIORI_GENIE_MODEL=gemini-flash-lite-latest`, or `FIORI_GENIE_PROVIDER=demo` with sample specs |
 | `fiori-genie: command not found` | `source .venv/bin/activate` then `pip install -e .` |
 
 ---
