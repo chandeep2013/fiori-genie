@@ -11,6 +11,7 @@ import json
 import re
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -43,6 +44,11 @@ def _is_fatal_provider_error(exc: ProviderError) -> bool:
             "timed out",
             "quota exceeded",
             "resource_exhausted",
+            "503",
+            "unavailable",
+            "high demand",
+            "overloaded",
+            "temporarily",
         )
     ):
         return False
@@ -134,18 +140,20 @@ def generate_project(
             attempts.append(Attempt(number, "parse", errors))
             if _is_fatal_provider_error(exc) or number >= max_attempts:
                 return Result(False, None, [], attempts, None)
+            # Brief pause helps 503 high-demand / rate-limit recoveries.
+            time.sleep(min(2 * number, 6))
             # Truncated / empty Gemini JSON is retryable — ask for a smaller model.
             messages += [
                 {
                     "role": "assistant",
-                    "content": "(previous response was empty, truncated, or invalid JSON)",
+                    "content": "(previous response was empty, truncated, invalid, or unavailable)",
                 },
                 {
                     "role": "user",
                     "content": (
                         build_repair_prompt(errors, "validate")
-                        + "\n\nEmit a COMPLETE smaller JSON model: at most 2 "
-                        "sampleData rows per entity, short labels, no long docs."
+                        + "\n\nEmit a COMPLETE smaller JSON model: omit sampleData, "
+                        "short labels, at most 3 entities, one service, one app."
                     ),
                 },
             ]

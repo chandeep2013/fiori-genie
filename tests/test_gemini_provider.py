@@ -9,6 +9,7 @@ from fiori_genie.providers import ProviderError
 from fiori_genie.providers.gemini_provider import (
     _extract_payload,
     _friendly_gemini_error,
+    _is_overload_error,
     _looks_truncated,
     _sanitize_schema,
     _strip_fences,
@@ -61,6 +62,22 @@ def test_friendly_quota_error():
     )
     assert "per Google project" in msg
     assert "demo" in msg
+
+
+def test_friendly_overload_error():
+    err = RuntimeError(
+        "503 UNAVAILABLE. This model is currently experiencing high demand."
+    )
+    assert _is_overload_error(err)
+    msg = _friendly_gemini_error(err)
+    assert "overloaded" in msg.lower() or "high demand" in msg.lower()
+    assert "demo" in msg
+
+
+def test_503_is_not_fatal():
+    assert not _is_fatal_provider_error(
+        ProviderError("Gemini request failed: 503 UNAVAILABLE high demand")
+    )
 
 
 def test_sanitize_schema_drops_sample_data():

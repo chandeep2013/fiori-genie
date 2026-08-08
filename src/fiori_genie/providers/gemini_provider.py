@@ -11,6 +11,7 @@ import copy
 import concurrent.futures
 import json
 import os
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..json_util import loads_maybe_repaired
@@ -19,7 +20,15 @@ from . import ProviderError
 # Prefer the lite floating alias: free-tier accounts often exhaust the main
 # Flash quota while flash-lite still has capacity.
 DEFAULT_MODEL = "gemini-flash-lite-latest"
-DEFAULT_TIMEOUT_S = 120
+DEFAULT_TIMEOUT_S = 180
+
+# Tried in order when the primary model returns 503 high-demand.
+_FALLBACK_MODELS = (
+    "gemini-flash-lite-latest",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+    "gemini-2.0-flash-lite",
+)
 
 # Keys Gemini rejects when used as JSON Schema *metadata*.
 # Do not strip these when they appear as property names under "properties".
@@ -241,6 +250,13 @@ class GeminiProvider:
             )
         return contents
 
+    def _model_candidates(self) -> List[str]:
+        ordered: List[str] = []
+        for name in (self.model, *_FALLBACK_MODELS):
+            if name and name not in ordered:
+                ordered.append(name)
+        return ordered
+
     def _call(
         self,
         types: Any,
@@ -251,34 +267,57 @@ class GeminiProvider:
         with_schema: bool,
     ) -> Any:
         def _invoke() -> Any:
-            try:
-                return self._generate_once(
-                    types, system, contents, clean_schema, with_schema=with_schema
-                )
-            except ProviderError:
-                raise
-            except Exception as exc:
-                message = str(exc)
-                if with_schema and (
-                    "INVALID_ARGUMENT" in message or "additionalProperties" in message
-                ):
-                    try:
-                        return self._generate_once(
-                            types,
-                            system
-                            + "\n\nRespond with ONLY a JSON object that matches "
-                            "the application model schema. No markdown fences. "
-                            "Omit sampleData.",
-                            contents,
-                            clean_schema,
-                            with_schema=False,
-                        )
-                    except Exception as retry_exc:
-                        raise ProviderError(
-                            _friendly_gemini_error(retry_exc)
-                        ) from retry_exc
-                raise ProviderError(_friendly_gemini_error(exc)) from exc
+            last_exc: Optional[Exception] = None
+            models = self._model_candidates()
+            for index, model in enumerate(models):
+                try:
+                    return self._generate_once(
+                        types,
+                        system,
+                        contents,
+                        clean_schema,
+                        model=model,
+                        with_schema=with_schema,
+                    )
+                except ProviderError:
+                    raise
+                except Exception as exc:
+                    last_exc = exc
+                    message = str(exc)
+                    if _is_overload_error(exc) and index < len(models) - 1:
+                        time.sleep(min(2**index, 8))
+                        continue
+                    if with_schema and (
+                        "INVALID_ARGUMENT" in message
+                        or "additionalProperties" in message
+                    ):
+                        try:
+                            return self._generate_once(
+                                types,
+                                system
+                                + "\n\nRespond with ONLY a JSON object that matches "
+                                "the application model schema. No markdown fences. "
+                                "Omit sampleData.",
+                                contents,
+                                clean_schema,
+                                model=model,
+                                with_schema=False,
+                            )
+                        except Exception as retry_exc:
+                            raise ProviderError(
+                                _friendly_gemini_error(retry_exc)
+                            ) from retry_exc
+                    if _is_overload_error(exc):
+                        # Try next model even if schema path did not apply.
+                        if index < len(models) - 1:
+                            time.sleep(min(2**index, 8))
+                            continue
+                    raise ProviderError(_friendly_gemini_error(exc)) from exc
+            raise ProviderError(
+                _friendly_gemini_error(last_exc or RuntimeError("Gemini unavailable"))
+            )
 
+        # Allow model fallbacks + short sleeps inside one outer timeout.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(_invoke)
             try:
@@ -296,6 +335,7 @@ class GeminiProvider:
         contents: List[Any],
         clean_schema: Dict,
         *,
+        model: str,
         with_schema: bool,
     ) -> Any:
         config_kwargs: Dict[str, Any] = {
@@ -314,7 +354,7 @@ class GeminiProvider:
 
         try:
             return self._client.models.generate_content(
-                model=self.model,
+                model=model,
                 contents=contents,
                 config=types.GenerateContentConfig(**config_kwargs),
             )
@@ -323,17 +363,40 @@ class GeminiProvider:
             if "thinking" in str(exc).lower() and "thinking_config" in config_kwargs:
                 config_kwargs.pop("thinking_config", None)
                 return self._client.models.generate_content(
-                    model=self.model,
+                    model=model,
                     contents=contents,
                     config=types.GenerateContentConfig(**config_kwargs),
                 )
             raise
 
 
+def _is_overload_error(exc: Exception) -> bool:
+    lowered = str(exc).lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "503",
+            "unavailable",
+            "high demand",
+            "overloaded",
+            "try again later",
+            "temporarily",
+        )
+    )
+
+
 def _friendly_gemini_error(exc: Exception) -> str:
     """Map Google quota/auth failures to actionable guidance."""
     message = str(exc)
     lowered = message.lower()
+    if _is_overload_error(exc):
+        return (
+            "Gemini is temporarily overloaded (503 high demand). "
+            "This is on Google's side, not your API key. Wait a minute and retry, "
+            "or set FIORI_GENIE_PROVIDER=demo to generate from the sample specs "
+            "without calling Gemini. Original error: "
+            f"{message}"
+        )
     if any(
         marker in lowered
         for marker in (
