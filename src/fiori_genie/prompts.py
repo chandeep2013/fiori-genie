@@ -89,16 +89,13 @@ a UI list.
 
 SAMPLE DATA
 
-16. Provide exactly two realistic rows per entity (keep the JSON small — long \
-sampleData is the main cause of truncated model responses). Realistic means \
-plausible business content in the spec's domain, not "Test 1" and "Foo".
+16. Prefer omitting `sampleData` entirely so the JSON stays small enough to \
+finish. If you include it, at most two short rows per entity.
 
-17. Every row of an entity with `useCuid` must include an explicit `ID` holding \
-a valid UUID string. Reference a parent with the foreign key column \
-`<relationName>_ID` and a UUID that actually appears in that parent's rows.
-
-18. Write all values as strings. Dates use `YYYY-MM-DD`. Decimals use a plain \
-decimal point and match the declared scale.
+17. When sampleData is present, every row of an entity with `useCuid` must \
+include an explicit `ID` holding a valid UUID string. Reference a parent with \
+the foreign key column `<relationName>_ID` and a UUID that appears in that \
+parent's rows. Write values as strings (`YYYY-MM-DD` dates, plain decimals).
 
 Model exactly what the specification describes. Do not invent whole entities \
 the spec never mentions. Where the spec is silent on something structurally \

@@ -13,6 +13,7 @@ import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..json_util import loads_maybe_repaired
 from . import ProviderError
 
 # Prefer the lite floating alias: free-tier accounts often exhaust the main
@@ -32,11 +33,15 @@ _UNSUPPORTED_META_KEYS = {
     "const",
 }
 
+# sampleData balloons the response and is the #1 truncation cause — drop it
+# from the constrained schema; CSV rows are optional for a runnable app.
+_SCHEMA_DROP_PROPERTIES = {"sampleData"}
+
 _COMPACT_RETRY = (
     "Your previous JSON response was truncated or invalid. "
-    "Emit a COMPLETE application model as a single JSON object. "
-    "Keep it small: at most 2 sampleData rows per entity, short labels, "
-    "no long doc strings. Do not wrap in markdown."
+    "Emit a COMPLETE smaller application model as one JSON object. "
+    "Omit sampleData entirely. Use short labels, at most 3 entities, "
+    "one service, one app. Do not wrap in markdown."
 )
 
 
@@ -50,9 +55,14 @@ def _sanitize_schema(node: Any, *, in_properties: bool = False) -> Any:
         cleaned = {}
         for key, value in node.items():
             if in_properties:
+                if key in _SCHEMA_DROP_PROPERTIES:
+                    continue
                 cleaned[key] = _sanitize_schema(value, in_properties=False)
                 continue
             if key in _UNSUPPORTED_META_KEYS:
+                continue
+            if key == "required" and isinstance(value, list):
+                cleaned[key] = [item for item in value if item not in _SCHEMA_DROP_PROPERTIES]
                 continue
             cleaned[key] = _sanitize_schema(
                 value, in_properties=(key == "properties")
@@ -72,11 +82,13 @@ def _request_timeout_s() -> float:
 
 
 def _max_output_tokens() -> int:
-    raw = os.getenv("FIORI_GENIE_MAX_OUTPUT_TOKENS", "65536")
+    # Thinking-capable models share this budget with "thinking" tokens.
+    # Keep it high, and set thinking_budget=0 so JSON is not starved.
+    raw = os.getenv("FIORI_GENIE_MAX_OUTPUT_TOKENS", "8192")
     try:
         return max(2048, int(raw))
     except ValueError:
-        return 65536
+        return 8192
 
 
 def _strip_fences(text: str) -> str:
@@ -111,12 +123,8 @@ def _extract_payload(response: Any) -> Tuple[Optional[Dict], str, str]:
     if not text:
         return None, "", finish
 
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        return None, text, finish
-
-    if isinstance(data, dict):
+    data = loads_maybe_repaired(text)
+    if data is not None:
         return data, text, finish
     return None, text, finish
 
@@ -166,24 +174,29 @@ class GeminiProvider:
 
         contents = self._to_contents(messages, types)
         clean_schema = _sanitize_schema(copy.deepcopy(schema))
+        system = (
+            system
+            + "\n\nOmit sampleData from the JSON. Keep the model compact so the "
+            "response cannot be truncated."
+        )
 
         response = self._call(types, system, contents, clean_schema, with_schema=True)
         data, text, finish = _extract_payload(response)
         if data is not None:
             return data
 
-        # One compact retry — free-tier / VPN responses often truncate mid-JSON.
-        if text or _looks_truncated(text, finish) or not text:
+        # Compact retry with schema, then one last attempt without schema.
+        for with_schema in (True, False):
             retry_messages = list(messages) + [
                 {
                     "role": "assistant",
-                    "content": text[:4000] if text else "(empty or truncated JSON)",
+                    "content": (text[:2000] if text else "(empty or truncated JSON)"),
                 },
                 {"role": "user", "content": _COMPACT_RETRY},
             ]
             retry_contents = self._to_contents(retry_messages, types)
             response = self._call(
-                types, system, retry_contents, clean_schema, with_schema=True
+                types, system, retry_contents, clean_schema, with_schema=with_schema
             )
             data, text, finish = _extract_payload(response)
             if data is not None:
@@ -194,7 +207,8 @@ class GeminiProvider:
                 "Gemini returned an empty response"
                 + (f" (finish_reason={finish})" if finish else "")
                 + ". The free tier may be rate-limited — wait a minute and retry, "
-                "or set FIORI_GENIE_MODEL=gemini-flash-lite-latest."
+                "set FIORI_GENIE_MODEL=gemini-flash-lite-latest, or use "
+                "FIORI_GENIE_PROVIDER=demo."
             )
 
         hint = ""
@@ -202,8 +216,7 @@ class GeminiProvider:
             hint = (
                 " Response looks truncated"
                 + (f" (finish_reason={finish})" if finish else "")
-                + ". Try again, raise FIORI_GENIE_MAX_OUTPUT_TOKENS, or use a "
-                "shorter spec. VPN inspection can also cut long JSON responses."
+                + ". Retry, shorten the spec, or use FIORI_GENIE_PROVIDER=demo."
             )
         raise ProviderError(
             f"Gemini returned unparseable JSON: {self._json_error(text)}.{hint}"
@@ -239,38 +252,26 @@ class GeminiProvider:
     ) -> Any:
         def _invoke() -> Any:
             try:
-                config_kwargs: Dict[str, Any] = {
-                    "system_instruction": system,
-                    "response_mime_type": "application/json",
-                    "temperature": 0.2,
-                    "max_output_tokens": self.max_output_tokens,
-                }
-                if with_schema:
-                    config_kwargs["response_json_schema"] = clean_schema
-                return self._client.models.generate_content(
-                    model=self.model,
-                    contents=contents,
-                    config=types.GenerateContentConfig(**config_kwargs),
+                return self._generate_once(
+                    types, system, contents, clean_schema, with_schema=with_schema
                 )
+            except ProviderError:
+                raise
             except Exception as exc:
                 message = str(exc)
                 if with_schema and (
                     "INVALID_ARGUMENT" in message or "additionalProperties" in message
                 ):
                     try:
-                        return self._client.models.generate_content(
-                            model=self.model,
-                            contents=contents,
-                            config=types.GenerateContentConfig(
-                                system_instruction=(
-                                    system
-                                    + "\n\nRespond with ONLY a JSON object that matches "
-                                    "the application model schema. No markdown fences."
-                                ),
-                                response_mime_type="application/json",
-                                temperature=0.2,
-                                max_output_tokens=self.max_output_tokens,
-                            ),
+                        return self._generate_once(
+                            types,
+                            system
+                            + "\n\nRespond with ONLY a JSON object that matches "
+                            "the application model schema. No markdown fences. "
+                            "Omit sampleData.",
+                            contents,
+                            clean_schema,
+                            with_schema=False,
                         )
                     except Exception as retry_exc:
                         raise ProviderError(
@@ -287,6 +288,46 @@ class GeminiProvider:
                     f"Gemini timed out after {int(self.timeout_s)}s. "
                     "Check VPN/network, or raise FIORI_GENIE_LLM_TIMEOUT_S."
                 ) from exc
+
+    def _generate_once(
+        self,
+        types: Any,
+        system: str,
+        contents: List[Any],
+        clean_schema: Dict,
+        *,
+        with_schema: bool,
+    ) -> Any:
+        config_kwargs: Dict[str, Any] = {
+            "system_instruction": system,
+            "response_mime_type": "application/json",
+            "temperature": 0.2,
+            "max_output_tokens": self.max_output_tokens,
+        }
+        if with_schema:
+            config_kwargs["response_json_schema"] = clean_schema
+        # Prevent thinking tokens from eating the whole output budget.
+        try:
+            config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+        except Exception:
+            pass
+
+        try:
+            return self._client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=types.GenerateContentConfig(**config_kwargs),
+            )
+        except Exception as exc:
+            # Older / non-thinking models reject thinking_config.
+            if "thinking" in str(exc).lower() and "thinking_config" in config_kwargs:
+                config_kwargs.pop("thinking_config", None)
+                return self._client.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(**config_kwargs),
+                )
+            raise
 
 
 def _friendly_gemini_error(exc: Exception) -> str:

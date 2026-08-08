@@ -8,6 +8,7 @@ returned to the caller until the compiler has accepted it.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass, field
@@ -25,21 +26,42 @@ from .validate import validate_model
 
 Progress = Callable[[str], None]
 
-_FATAL_PROVIDER_MARKERS = (
-    "is not set",
-    "not installed",
-    "unknown provider",
-    "401",
-    "403",
-    "permission denied",
-    "api key",
-    "authentication",
-)
-
-
 def _is_fatal_provider_error(exc: ProviderError) -> bool:
+    """True only for credential/config failures — not truncated JSON retries.
+
+    Important: do not match bare '401'/'403' substrings; JSONDecodeError
+    messages often contain 'line 401' and would abort the repair loop.
+    """
     msg = str(exc).lower()
-    return any(marker in msg for marker in _FATAL_PROVIDER_MARKERS)
+    # Always retry truncated / empty Gemini responses.
+    if any(
+        marker in msg
+        for marker in (
+            "unparseable json",
+            "truncated",
+            "empty response",
+            "timed out",
+            "quota exceeded",
+            "resource_exhausted",
+        )
+    ):
+        return False
+    if any(
+        marker in msg
+        for marker in (
+            "is not set",
+            "not installed",
+            "unknown provider",
+            "permission denied",
+        )
+    ):
+        return True
+    if "api key" in msg or "authentication" in msg:
+        return True
+    # HTTP status codes as whole words only (not 'line 401 column …').
+    if re.search(r"(?<![a-z0-9])(401|403)(?![a-z0-9])", msg) and "line " not in msg:
+        return True
+    return False
 
 
 @dataclass

@@ -10,6 +10,7 @@ from fiori_genie.providers.gemini_provider import (
     _extract_payload,
     _friendly_gemini_error,
     _looks_truncated,
+    _sanitize_schema,
     _strip_fences,
 )
 
@@ -60,3 +61,19 @@ def test_friendly_quota_error():
     )
     assert "per Google project" in msg
     assert "demo" in msg
+
+
+def test_sanitize_schema_drops_sample_data():
+    schema = {
+        "type": "object",
+        "properties": {
+            "projectName": {"type": "string"},
+            "sampleData": {"type": "object"},
+            "title": {"type": "string"},  # property name must survive
+        },
+        "required": ["projectName", "sampleData"],
+    }
+    cleaned = _sanitize_schema(schema)
+    assert "sampleData" not in cleaned["properties"]
+    assert "sampleData" not in cleaned["required"]
+    assert "title" in cleaned["properties"]
